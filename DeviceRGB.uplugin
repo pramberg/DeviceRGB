@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "DeviceRGB",
+	"Description": "Plugin that lets you control RGB devices using Unreal materials.",
+	"Category": "Other",
+	"CreatedBy": "Viktor Pramberg",
+	"CreatedByURL": "https://viktorpramberg.com",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "DeviceRGB",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
