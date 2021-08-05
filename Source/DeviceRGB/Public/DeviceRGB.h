@@ -1,14 +1,8 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
+// Copyright(c) 2021 Viktor Pramberg
 #pragma once
 
 #include "Modules/ModuleManager.h"
 
 class FDeviceRGBModule : public IModuleInterface
 {
-public:
-
-	/** IModuleInterface implementation */
-	virtual void StartupModule() override;
-	virtual void ShutdownModule() override;
 };
