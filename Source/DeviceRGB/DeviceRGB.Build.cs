@@ -43,9 +43,21 @@ public class DeviceRGB : ModuleRules
 		{
 			string BaseLibraryPath = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "ThirdParty"));
 
-			PublicIncludePaths.Add(Path.Combine(BaseLibraryPath, "CUESDK", "include"));
+			PublicIncludePaths.AddRange(
+				new string[]
+                {
+					Path.Combine(BaseLibraryPath, "CUESDK", "include"),
+					Path.Combine(BaseLibraryPath, "ChromaSDK", "include"),
+				}
+			);
 			PublicAdditionalLibraries.Add(Path.Combine(BaseLibraryPath, "CUESDK", "lib", "x64", "CUESDK.x64_2017.lib"));
-			PublicDelayLoadDLLs.Add("CUESDK.x64_2017.dll");
+			PublicDelayLoadDLLs.AddRange(
+				new string[]
+                {
+					"CUESDK.x64_2017.dll",
+					"RzChromaSDK64.dll",
+				}
+			);
 		}
 	}
 }

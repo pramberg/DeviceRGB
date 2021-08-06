@@ -9,8 +9,10 @@
 #include <Components/SceneCaptureComponent2D.h>
 #include <UnrealClient.h>
 #include <TextureResource.h>
-#include "Corsair/CorsairDeviceSDK.h"
 #include "IDevice.h"
+
+#include "Corsair/CorsairDeviceSDK.h"
+#include "Razer/RazerDeviceSDK.h"
 
 void UDeviceRGBSubsystem::SetTexture(UTexture2D* InTexture)
 {
@@ -82,7 +84,7 @@ void UDeviceRGBSubsystem::SetMaterial(UMaterialInterface* InMaterial)
 }
 
 template<typename T>
-void AddDeviceIfValid(TArray<TUniquePtr<IDeviceSDK>>& Collection)
+void AddSDKIfValid(TArray<TUniquePtr<IDeviceSDK>>& Collection)
 {
 	auto Temp = MakeUnique<T>();
 	if (Temp->IsValid())
@@ -95,7 +97,8 @@ void UDeviceRGBSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	AddDeviceIfValid<FCorsairDeviceSDK>(SupportedSDKs);
+	AddSDKIfValid<FCorsairDeviceSDK>(SupportedSDKs);
+	AddSDKIfValid<FRazerDeviceSDK>(SupportedSDKs);
 
 	ViewExtension = FSceneViewExtensions::NewExtension<FDeviceRGBSceneViewExtension>(this);
 }
