@@ -5,4 +5,7 @@
 
 class FDeviceRGBModule : public IModuleInterface
 {
+public:
+	virtual void StartupModule() override;
+
 };

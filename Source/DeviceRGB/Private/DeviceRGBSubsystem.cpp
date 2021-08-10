@@ -14,6 +14,7 @@
 #include "Corsair/CorsairDeviceSDK.h"
 #include "Razer/RazerDeviceSDK.h"
 
+// This should probably be done using a default material, so we can do fancy features in the shader, like supersampling, and benefit from that when using textures too. Just make sure to only update the colors once, since they are persistent.
 void UDeviceRGBSubsystem::SetTexture(UTexture2D* InTexture)
 {
 	/*if (!InTexture)
@@ -54,33 +55,12 @@ void UDeviceRGBSubsystem::SetTexture(UTexture2D* InTexture)
 // Need to be able to make layers where material only affects that layer. So say a base layer has one material, then another material is assigned to WASD as another layer.
 void UDeviceRGBSubsystem::SetMaterial(UMaterialInterface* InMaterial)
 {
-	UWorld* World = GetTickableGameObjectWorld();
-	if (!RenderTarget && World)
-	{
-		RenderTarget = NewObject<UTextureRenderTarget2D>(World);
-		RenderTarget->InitCustomFormat(128, 64, EPixelFormat::PF_R8G8B8A8, false);
-
-		Capture = NewObject<USceneCaptureComponent2D>(World);
-		Capture->TextureTarget = RenderTarget;
-		Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
-		Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
-		/*Capture->bCaptureEveryFrame = false;
-		Capture->bCaptureOnMovement = false;*/
-	}
-
-	if (CurrentGraphic.IsType<UMaterialInterface*>())
-	{
-		Capture->AddOrUpdateBlendable(CurrentGraphic.Get<UMaterialInterface*>(), 0.0f);
-	}
-
-	CurrentGraphic.Set<UMaterialInterface*>(InMaterial);
-
 	if (!InMaterial)
 	{
 		return;
 	}
 
-	Capture->AddOrUpdateBlendable(InMaterial);
+	CurrentGraphic.Set<UMaterialInterface*>(InMaterial);
 }
 
 template<typename T>
@@ -100,6 +80,17 @@ void UDeviceRGBSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	AddSDKIfValid<FCorsairDeviceSDK>(SupportedSDKs);
 	AddSDKIfValid<FRazerDeviceSDK>(SupportedSDKs);
 
+	for (auto& SDK : SupportedSDKs)
+	{
+		SDK->ForEachDevice([&](IDevice* InDevice)
+		{
+			for (const auto& LEDInfo : InDevice->GetLEDInfos())
+			{
+				CachedLEDInfos.Add(LEDInfo);
+			}
+		});
+	}
+
 	ViewExtension = FSceneViewExtensions::NewExtension<FDeviceRGBSceneViewExtension>(this);
 }
 
@@ -108,71 +99,6 @@ void UDeviceRGBSubsystem::Deinitialize()
 	Super::Deinitialize();
 
 	ViewExtension.Reset();
-}
-
-void UDeviceRGBSubsystem::Tick(float DeltaTime)
-{
-	if (!Capture)
-		return;
-
-	Capture->CaptureSceneDeferred();
-
-	if (!RenderTarget)
-	{
-		return;
-	}
-
-	int32 Width = RenderTarget->SizeX;
-	int32 Height = RenderTarget->SizeY;
-
-	FReadSurfaceDataFlags ReadSurfaceDataFlags;
-
-	FRenderTarget* RTResourceRaw = RenderTarget->GameThread_GetRenderTargetResource();
-
-	const int32 NumPixelsToRead = Width * Height;
-
-	TArray<FColor> Pixels;
-	Pixels.SetNumUninitialized(NumPixelsToRead);
-	if (!RTResourceRaw || !RTResourceRaw->ReadPixelsPtr(Pixels.GetData(), ReadSurfaceDataFlags))
-	{
-		return;
-	}
-
-	for (auto& SDK : SupportedSDKs)
-	{
-		SDK->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
-		{
-			for (const auto& LEDInfo : InDevice->GetLEDInfos())
-			{
-				const int32 X2 = FMath::FloorToInt(LEDInfo.UV.X * Width);
-				const int32 Y2 = FMath::FloorToInt(LEDInfo.UV.Y * Height);
-				const FColor PixelColor = Pixels[Y2 * Width + X2];
-				OutColors.Add(PixelColor);
-			}
-		});
-	}
-}
-
-bool UDeviceRGBSubsystem::IsTickable() const
-{
-	
-	//UE_LOG(LogTemp, Display, TEXT("Check tick %d"), GetCurrentGraphic().IsType<UMaterialInterface*>());
-	return GetCurrentGraphic().IsType<UMaterialInterface*>();
-}
-
-TStatId UDeviceRGBSubsystem::GetStatId() const
-{
-	RETURN_QUICK_DECLARE_CYCLE_STAT(UDeviceRGBSubsystem, STATGROUP_Tickables);
-}
-
-UWorld* UDeviceRGBSubsystem::GetTickableGameObjectWorld() const
-{
-	return GWorld;
-}
-
-bool UDeviceRGBSubsystem::IsTickableInEditor() const
-{
-	return true;
 }
 
 bool UDeviceRGBSubsystem::ShouldCreateSubsystem(UObject* Outer) const

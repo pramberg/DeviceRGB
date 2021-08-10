@@ -21,6 +21,9 @@ public class DeviceRGB : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"RenderCore",
+				"Renderer",
+				"RHI",
 			}
 		);
 

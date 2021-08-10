@@ -14,13 +14,13 @@ enum class EDeviceRGBType : uint8
 class IDeviceSDK;
 
 // Most important info
-struct DeviceLEDInfo
+struct FDeviceLEDInfo
 {
 	// Normalized location
 	FVector2D UV;
 };
 
-struct AdditionalDeviceLEDInfo
+struct FAdditionalDeviceLEDInfo
 {
 public:
 	FKey Key;
@@ -38,7 +38,7 @@ public:
 	/**
 	 * Gets the LED infos.
 	 */
-	virtual TArray<DeviceLEDInfo> GetLEDInfos() const = 0;
+	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const = 0;
 
 	/**
 	 * Gets the size of the device. This

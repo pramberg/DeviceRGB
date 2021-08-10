@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "IDevice.h"
 #include "RazerDeviceSDK.h"
+#include <array>
 
 template<ERazerDeviceType DeviceType> int32 GetDeviceWidth() { return 0; }
 template<> int32 GetDeviceWidth<ERazerDeviceType::Keyboard>() { return ChromaSDK::Keyboard::v2::MAX_COLUMN; }
@@ -36,6 +37,38 @@ template<> struct FCustomEffectContainer<ERazerDeviceType::Mouse> { ChromaSDK::M
 template<> struct FCustomEffectContainer<ERazerDeviceType::Keypad> { ChromaSDK::Keypad::CUSTOM_EFFECT_TYPE Effect{}; };
 template<> struct FCustomEffectContainer<ERazerDeviceType::ChromaLink> { ChromaSDK::ChromaLink::CUSTOM_EFFECT_TYPE Effect{}; };
 
+template<ERazerDeviceType DeviceType> FVector2D GetUV(const FIntPoint& InPosition, const FVector2D& InDeviceSize)
+{
+	return FVector2D(InPosition) / InDeviceSize;
+}
+
+// Because Razer's mousepads are 1D, we have to remap them to 2D manually.
+template<> FVector2D GetUV<ERazerDeviceType::Mousepad>(const FIntPoint& InPosition, const FVector2D& InDeviceSize)
+{
+	constexpr float OneTenth = 1.0f / 10.0f;
+	constexpr float OneFourteenth = 1.0f / 14.0f;
+	static const std::array<FVector2D, 15> Positions
+	{
+		FVector2D(OneFourteenth * 13.0f, OneTenth * 1.0f),
+		FVector2D(OneFourteenth * 13.0f, OneTenth * 3.0f),
+		FVector2D(OneFourteenth * 13.0f, OneTenth * 5.0f),
+		FVector2D(OneFourteenth * 13.0f, OneTenth * 7.0f),
+		FVector2D(OneFourteenth * 13.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 11.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 9.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 7.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 5.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 3.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 1.0f, OneTenth * 9.0f),
+		FVector2D(OneFourteenth * 1.0f, OneTenth * 7.0f),
+		FVector2D(OneFourteenth * 1.0f, OneTenth * 5.0f),
+		FVector2D(OneFourteenth * 1.0f, OneTenth * 3.0f),
+		FVector2D(OneFourteenth * 1.0f, OneTenth * 1.0f)
+	};
+
+	return Positions[InPosition.X];
+}
+
 // This is a template so we can get the correct function ptr at compile time
 template<ERazerDeviceType DeviceType>
 class FRazerDevice : public IDevice
@@ -47,13 +80,15 @@ public:
 		const int32 DeviceHeight = GetDeviceHeight<DeviceType>();
 		DeviceSize = FVector2D{ static_cast<float>(DeviceWidth), static_cast<float>(DeviceHeight) };
 
-		for (int32 Row = 0; Row < DeviceHeight; Row++)
+		FIntPoint Position{ EForceInit::ForceInitToZero };
+		for (; Position.Y < DeviceHeight; Position.Y++)
 		{
-			for (int32 Col = 0; Col < DeviceWidth; Col++)
+			for (; Position.X < DeviceWidth; Position.X++)
 			{
-				LEDInfos.Add({ {static_cast<float>(Col) / DeviceSize.X, static_cast<float>(Row) / DeviceSize.Y} });
-				SetEffectColor(Col, Row, FColor::Red);
+				LEDInfos.Add({ GetUV<DeviceType>(Position, DeviceSize) });
+				SetEffectColor(Position, FColor::Red);
 			}
+			Position.X = 0;
 		}
 	}
 
@@ -65,13 +100,15 @@ public:
 	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true) override
 	{
 		auto It = InColors.CreateConstIterator();
-		for (int32 Row = 0; Row < GetDeviceHeight<DeviceType>(); Row++)
+		FIntPoint Position{ EForceInit::ForceInitToZero };
+		for (; Position.Y < GetDeviceHeight<DeviceType>(); Position.Y++)
 		{
-			for (int32 Col = 0; Col < GetDeviceWidth<DeviceType>(); Col++)
+			for (; Position.X < GetDeviceWidth<DeviceType>(); Position.X++)
 			{
-				SetEffectColor(Col, Row, *It);
+				SetEffectColor(Position, *It);
 				++It;
 			}
+			Position.X = 0;
 		}
 
 		if constexpr (DeviceType == ERazerDeviceType::Keyboard)
@@ -101,20 +138,20 @@ public:
 		return true;
 	}
 
-	virtual TArray<DeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
+	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
 	virtual FVector2D GetPhysicalSize() const override { return DeviceSize; }
 	virtual EDeviceRGBType GetType() const override { return EDeviceRGBType::Keyboard; }
 
 private:
-	void SetEffectColor(int32 InX, int32 InY, const FColor& InColor)
+	void SetEffectColor(const FIntPoint& InPos, const FColor& InColor)
 	{
 		if constexpr (GetDeviceDimensions<DeviceType>() == 1)
 		{
-			EffectContainer.Effect.Color[InX] = FColorToRazerColor(InColor);
+			EffectContainer.Effect.Color[InPos.X] = FColorToRazerColor(InColor);
 		}
 		else if constexpr (GetDeviceDimensions<DeviceType>() == 2)
 		{
-			EffectContainer.Effect.Color[InY][InX] = FColorToRazerColor(InColor);
+			EffectContainer.Effect.Color[InPos.Y][InPos.X] = FColorToRazerColor(InColor);
 		}
 	}
 
@@ -132,7 +169,7 @@ private:
 		return FColor(Red, Green, Blue, Alpha);
 	}
 
-	TArray<DeviceLEDInfo> LEDInfos;
+	TArray<FDeviceLEDInfo> LEDInfos;
 	FCustomEffectContainer<DeviceType> EffectContainer;
 	FVector2D DeviceSize;
 	EDeviceRGBType Type;

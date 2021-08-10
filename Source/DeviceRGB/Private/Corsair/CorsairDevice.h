@@ -11,14 +11,14 @@ public:
 	FCorsairDevice(int32 InDeviceIndex);
 	virtual int32 GetNumLEDs() const override;
 	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true) override;
-	virtual TArray<DeviceLEDInfo> GetLEDInfos() const override;
+	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override;
 	virtual FVector2D GetPhysicalSize() const override;
 	virtual EDeviceRGBType GetType() const override;
 
 private:
 	FVector2D GetDeviceSize(const CorsairLedPositions* InPositions);
 
-	TArray<DeviceLEDInfo> LEDInfos;
+	TArray<FDeviceLEDInfo> LEDInfos;
 	TArray<CorsairLedColor> Colors;
 	FVector2D DeviceSize;
 	EDeviceRGBType Type;

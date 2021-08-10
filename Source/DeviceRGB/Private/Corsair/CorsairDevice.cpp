@@ -33,7 +33,7 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 			return asdf;
 		}();
 
-		LEDInfos.Add(DeviceLEDInfo{ UV });
+		LEDInfos.Add(FDeviceLEDInfo{ UV });
 		Colors.Add({ CurrentLED.ledId, 0, 0, 0});
 	}
 
@@ -68,7 +68,7 @@ bool FCorsairDevice::SetColors(const TArray<FColor>& InColors, bool bInFlushBuff
 	return bSuccessful;
 }
 
-TArray<DeviceLEDInfo> FCorsairDevice::GetLEDInfos() const
+TArray<FDeviceLEDInfo> FCorsairDevice::GetLEDInfos() const
 {
 	return LEDInfos;
 }
