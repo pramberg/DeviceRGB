@@ -21,29 +21,36 @@ BEGIN_SHADER_PARAMETER_STRUCT(FDeviceRGBMaterialParameters, )
 	SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<float4>, Colors)
 END_SHADER_PARAMETER_STRUCT()
 
-class FDeviceRGBMaterialShader : public FMaterialShader
+enum class EDeviceRGBBlendMode : uint8
+{
+	AlphaBlend,
+	Additive,
+	Multiply,
+	MAX,
+};
+
+class FDeviceRGBMaterialCS : public FMaterialShader
 {
 public:
 	using FParameters = FDeviceRGBMaterialParameters;
-	SHADER_USE_PARAMETER_STRUCT_WITH_LEGACY_BASE(FDeviceRGBMaterialShader, FMaterialShader);
+	SHADER_USE_PARAMETER_STRUCT_WITH_LEGACY_BASE(FDeviceRGBMaterialCS, FMaterialShader);
 
-	class FMobileDimension : SHADER_PERMUTATION_BOOL("POST_PROCESS_MATERIAL_MOBILE");
-	using FPermutationDomain = TShaderPermutationDomain<FMobileDimension>;
+	DECLARE_SHADER_TYPE(FDeviceRGBMaterialCS, Material);
+
+	class FBlendModeDimension : SHADER_PERMUTATION_ENUM_CLASS("DEVICERGB_BLEND_MODE", EDeviceRGBBlendMode);
+	using FPermutationDomain = TShaderPermutationDomain<FBlendModeDimension>;
+
+	static void SetParameters(FRHICommandList& RHICmdList, const TShaderRef<FDeviceRGBMaterialCS>& Shader, const FViewInfo& View, const FMaterialRenderProxy* Proxy, const FParameters& Parameters)
+	{
+		FMaterialShader* MaterialShader = Shader.GetShader();
+		MaterialShader->SetParameters(RHICmdList, Shader.GetComputeShader(), Proxy, *Proxy->GetMaterial(View.GetFeatureLevel()), View);
+	}
 
 	static bool ShouldCompilePermutation(const FMaterialShaderPermutationParameters& Parameters)
 	{
 		if (Parameters.MaterialParameters.MaterialDomain == MD_PostProcess)
 		{
-			const FPermutationDomain PermutationVector(Parameters.PermutationId);
-
-			if (PermutationVector.Get<FMobileDimension>())
-			{
-				return IsMobilePlatform(Parameters.Platform) && IsMobileHDR();
-			}
-			else
-			{
-				return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
-			}
+			return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
 		}
 		return false;
 	}
@@ -51,50 +58,8 @@ public:
 	static void ModifyCompilationEnvironment(const FMaterialShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 	{
 		FMaterialShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+
 		OutEnvironment.SetDefine(TEXT("POST_PROCESS_MATERIAL"), 1);
-
-		EBlendableLocation Location = EBlendableLocation(Parameters.MaterialParameters.BlendableLocation);
-		OutEnvironment.SetDefine(TEXT("POST_PROCESS_MATERIAL_BEFORE_TONEMAP"), (Location == BL_AfterTonemapping || Location == BL_ReplacingTonemapper) ? 0 : 1);
-		
-		FPermutationDomain PermutationVector(Parameters.PermutationId);
-		if (PermutationVector.Get<FMobileDimension>())
-		{
-			OutEnvironment.SetDefine(TEXT("POST_PROCESS_MATERIAL_BEFORE_TONEMAP"), (Parameters.MaterialParameters.BlendableLocation != BL_AfterTonemapping) ? 1 : 0);
-		}
-	}
-
-protected:
-	template <typename TRHIShader>
-	static void SetParameters(FRHICommandList& RHICmdList, const TShaderRef<FDeviceRGBMaterialShader>& Shader, TRHIShader* ShaderRHI, const FViewInfo& View, const FMaterialRenderProxy* Proxy, const FParameters& Parameters)
-	{
-		FMaterialShader* MaterialShader = Shader.GetShader();
-		MaterialShader->SetParameters(RHICmdList, ShaderRHI, Proxy, *Proxy->GetMaterial(View.GetFeatureLevel()), View);
-		SetShaderParameters(RHICmdList, Shader, ShaderRHI, Parameters);
-	}
-};
-
-class FDeviceRGBMaterialCS : public FDeviceRGBMaterialShader
-{
-public:
-	DECLARE_SHADER_TYPE(FDeviceRGBMaterialCS, Material);
-
-	static void SetParameters(FRHICommandList& RHICmdList, const TShaderRef<FDeviceRGBMaterialCS>& Shader, const FViewInfo& View, const FMaterialRenderProxy* Proxy, const FParameters& Parameters)
-	{
-		FDeviceRGBMaterialShader::SetParameters(RHICmdList, Shader, Shader.GetPixelShader(), View, Proxy, Parameters);
-	}
-
-	FDeviceRGBMaterialCS() = default;
-	FDeviceRGBMaterialCS(const ShaderMetaType::CompiledShaderInitializerType& Initializer)
-		: FDeviceRGBMaterialShader(Initializer)
-	{}
-
-	static void ModifyCompilationEnvironment(const FMaterialShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
-	{
-		FDeviceRGBMaterialShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
-
-		uint32 StencilCompareFunction = Parameters.MaterialParameters.bIsStencilTestEnabled ? Parameters.MaterialParameters.StencilCompare : EMaterialStencilCompare::MSC_Never;
-
-		OutEnvironment.SetDefine(TEXT("MOBILE_STENCIL_COMPARE_FUNCTION"), StencilCompareFunction);
 
 		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_X"), 64);
 		OutEnvironment.SetDefine(TEXT("THREADGROUPSIZE_Y"), 1);
@@ -226,12 +191,10 @@ void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& 
 		Parameters->Colors = GraphBuilder.CreateUAV(ColorsBuffer);
 	}
 	
-	const bool bIsMobile = View.GetFeatureLevel() <= ERHIFeatureLevel::ES3_1;
 	const int32 NumItems = EngineSubsystem->GetCachedInfos().Num();
-	FDeviceRGBMaterialCS::FPermutationDomain PermutationVector;
-	PermutationVector.Set<FDeviceRGBMaterialCS::FMobileDimension>(bIsMobile);
 
-	
+	FDeviceRGBMaterialCS::FPermutationDomain PermutationVector;
+	PermutationVector.Set<FDeviceRGBMaterialCS::FBlendModeDimension>(EDeviceRGBBlendMode::AlphaBlend);
 	auto Shader = ShaderMap->GetShader<FDeviceRGBMaterialCS>(PermutationVector);
 	
 	RDG_EVENT_SCOPE(GraphBuilder, "Layers");
@@ -241,9 +204,7 @@ void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& 
 	GraphBuilder.AddPass(RDG_EVENT_NAME("Layer 0 - %s", *MaterialInterface->GetName()), Parameters, 
 		ERDGPassFlags::Compute, [&View, Shader, Proxy, Parameters, NumItems](FRHICommandList& RHICmdList)
 	{
-		FMaterialShader* MaterialShader = Shader.GetShader();
-		MaterialShader->SetParameters(RHICmdList, Shader.GetComputeShader(), Proxy, *Proxy->GetMaterial(View.GetFeatureLevel()), static_cast<const FViewInfo&>(View));
-
+		FDeviceRGBMaterialCS::SetParameters(RHICmdList, Shader, static_cast<const FViewInfo&>(View), Proxy, *Parameters);
 		FComputeShaderUtils::Dispatch(RHICmdList, Shader, *Parameters, FComputeShaderUtils::GetGroupCount(NumItems, 64));
 	});
 
@@ -302,18 +263,15 @@ void FDeviceRGBSceneViewExtension::EndFrame()
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, Colors = MoveTemp(ColorsTemp)]()
 			{
 				auto It = Colors.CreateConstIterator();
-				for (auto& SDK : EngineSubsystem->SupportedSDKs)
+				EngineSubsystem->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
 				{
-					SDK->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
+					for (const auto& LEDInfo : InDevice->GetLEDInfos())
 					{
-						for (const auto& LEDInfo : InDevice->GetLEDInfos())
-						{
-							// I am still on the fence whether to convert to sRGB or not? When converting it gets brighter, which is a good thing generally.
-							OutColors.Add((*It).ToFColor(true));
-							++It;
-						}
-					});
-				}
+						// I am still on the fence whether to convert to sRGB or not? When converting it gets brighter, which is a good thing generally.
+						OutColors.Add((*It).ToFColor(true));
+						++It;
+					}
+				});
 			});
 		}
 	});

@@ -105,3 +105,14 @@ bool UDeviceRGBSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
 	return PLATFORM_WINDOWS;
 }
+
+void UDeviceRGBSubsystem::SetColors(TFunctionRef<void(IDevice*, TArray<FColor>&)> InFunction)
+{
+	for (auto& SDK : SupportedSDKs)
+	{
+		SDK->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
+		{
+			InFunction(InDevice, OutColors);
+		});
+	}
+}

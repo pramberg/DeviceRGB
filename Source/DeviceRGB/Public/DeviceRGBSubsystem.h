@@ -29,7 +29,6 @@ public:
 
 	decltype(auto) GetCurrentGraphic() const { return (CurrentGraphic); }
 
-
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -38,12 +37,14 @@ public:
 
 	const TArray<FDeviceLEDInfo>& GetCachedInfos() const { return CachedLEDInfos; }
 
-	TArray<TUniquePtr<IDeviceSDK>> SupportedSDKs;
+	void SetColors(TFunctionRef<void(IDevice*, TArray<FColor>&)> InFunction);
+
 private:
 	TVariant<UTexture2D*, UMaterialInterface*> CurrentGraphic;
 
 	TSharedPtr<FDeviceRGBSceneViewExtension, ESPMode::ThreadSafe> ViewExtension;
 
+	TArray<TUniquePtr<IDeviceSDK>> SupportedSDKs;
 	// Contains all connected devices' infos. 
 	TArray<FDeviceLEDInfo> CachedLEDInfos;
 };
