@@ -1,8 +1,9 @@
 // Copyright(c) 2021 Viktor Pramberg
 #include "RazerDeviceSDK.h"
-#include <Interfaces/IPluginManager.h>
 #include "RazerDevice.h"
 #include "IDevice.h"
+
+#include <GeneralProjectSettings.h>
 
 #define IMPORT_FUNC(InName) InName = reinterpret_cast<decltype(InName)>(FPlatformProcess::GetDllExport(SDKHandle, TEXT(#InName)))
 
@@ -13,15 +14,16 @@ FRazerDeviceSDK::FRazerDeviceSDK()
 	SDKHandle = FPlatformProcess::GetDllHandle(LibraryPath);
 	if (!SDKHandle)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to find Razer DLL!!!!"));
 		return;
 	}
 
+	const auto* ProjectSettings = GetDefault<UGeneralProjectSettings>();
+	
 	ChromaSDK::APPINFOTYPE AppInfo{};
-	_tcscpy_s(AppInfo.Title, 256, TEXT("Test Title"));
-	_tcscpy_s(AppInfo.Description, 1024, TEXT("Test Desc"));
-	_tcscpy_s(AppInfo.Author.Name, 256, TEXT("Viktor Pramberg"));
-	_tcscpy_s(AppInfo.Author.Contact, 256, TEXT("hi@viktorpramberg.com"));
+	_tcscpy_s(AppInfo.Title, 256, ProjectSettings->ProjectName.IsEmpty() ? *FApp::GetName() : *ProjectSettings->ProjectName);
+	_tcscpy_s(AppInfo.Description, 1024, *ProjectSettings->Description);
+	_tcscpy_s(AppInfo.Author.Name, 256, *ProjectSettings->CompanyName);
+	_tcscpy_s(AppInfo.Author.Contact, 256, *ProjectSettings->Homepage);
 	AppInfo.SupportedDevice = (0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20);
 	AppInfo.Category = 1;
 
@@ -47,6 +49,7 @@ FRazerDeviceSDK::FRazerDeviceSDK()
 		UnInit();
 		FPlatformProcess::FreeDllHandle(SDKHandle);
 		SDKHandle = nullptr;
+		return;
 	}
 
 	if (HasAnyKeyboard())
@@ -77,14 +80,17 @@ FRazerDeviceSDK::FRazerDeviceSDK()
 
 FRazerDeviceSDK::~FRazerDeviceSDK()
 {
-	UnInit();
-	FPlatformProcess::FreeDllHandle(SDKHandle);
-	SDKHandle = nullptr;
+	if (SDKHandle)
+	{
+		UnInit();
+		FPlatformProcess::FreeDllHandle(SDKHandle);
+		SDKHandle = nullptr;
+	}
 }
 
 int32 FRazerDeviceSDK::GetNumberOfDevices() const
 {
-	return 0;
+	return Devices.Num();
 }
 
 void FRazerDeviceSDK::FlushBuffers()
