@@ -19,11 +19,16 @@ FRazerDeviceSDK::FRazerDeviceSDK()
 
 	const auto* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	
+	const auto StringOrDefault = [](const FString& InDesired, const TCHAR* InDefault)
+	{
+		return InDesired.IsEmpty() ? InDefault : *InDesired;
+	};
+
 	ChromaSDK::APPINFOTYPE AppInfo{};
-	_tcscpy_s(AppInfo.Title, 256, ProjectSettings->ProjectName.IsEmpty() ? *FApp::GetName() : *ProjectSettings->ProjectName);
-	_tcscpy_s(AppInfo.Description, 1024, *ProjectSettings->Description);
-	_tcscpy_s(AppInfo.Author.Name, 256, *ProjectSettings->CompanyName);
-	_tcscpy_s(AppInfo.Author.Contact, 256, *ProjectSettings->Homepage);
+	_tcscpy_s(AppInfo.Title, 256, StringOrDefault(ProjectSettings->ProjectName, *FApp::GetName()));
+	_tcscpy_s(AppInfo.Description, 1024, StringOrDefault(ProjectSettings->Description, TEXT("Default Description - Please fill in 'Description' in Project Settings")));
+	_tcscpy_s(AppInfo.Author.Name, 256, StringOrDefault(ProjectSettings->CompanyName, TEXT("Default Author - Please fill in 'CompanyName' in Project Settings")));
+	_tcscpy_s(AppInfo.Author.Contact, 256, StringOrDefault(ProjectSettings->Homepage, TEXT("Contact - Please fill in 'Homepage' in Project Settings")));
 	AppInfo.SupportedDevice = (0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20);
 	AppInfo.Category = 1;
 
