@@ -24,6 +24,8 @@ public class DeviceRGB : ModuleRules
 				"RenderCore",
 				"Renderer",
 				"RHI",
+				"InputCore",
+				"EngineSettings",
 			}
 		);
 
@@ -61,6 +63,8 @@ public class DeviceRGB : ModuleRules
 					"RzChromaSDK64.dll",
 				}
 			);
+
+			RuntimeDependencies.Add("$(PluginDir)/Source/ThirdParty/CUESDK/redist/x64/CUESDK.x64_2017.dll");
 		}
 	}
 }
