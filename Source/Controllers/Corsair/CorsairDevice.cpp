@@ -1,5 +1,6 @@
 // Copyright(c) 2021 Viktor Pramberg
 #include "CorsairDevice.h"
+#include "CorsairController.h"
 #include <CUESDK.h>
 #include <algorithm>
 
@@ -47,8 +48,6 @@ int32 FCorsairDevice::GetNumLEDs() const
 
 bool FCorsairDevice::SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers /*= true*/)
 {
-	IDevice::SetColors(InColors, bInFlushBuffers);
-
 	auto It = InColors.CreateConstIterator();
 	for (auto& CorsairColor : Colors)
 	{
@@ -63,7 +62,7 @@ bool FCorsairDevice::SetColors(const TArray<FColor>& InColors, bool bInFlushBuff
 
 	if (bInFlushBuffers && bSuccessful)
 	{
-		FCorsairDeviceSDK::FlushBuffersImpl();
+		FCorsairController::FlushBuffersImpl();
 	}
 	return bSuccessful;
 }

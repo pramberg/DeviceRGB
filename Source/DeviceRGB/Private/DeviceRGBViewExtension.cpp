@@ -9,7 +9,7 @@
 #include <RHIDefinitions.h>
 #include <PostProcess/PostProcessing.h>
 #include <EngineModule.h>
-#include "IDevice.h"
+#include "IDeviceRGB.h"
 
 BEGIN_SHADER_PARAMETER_STRUCT(FDeviceRGBMaterialParameters, )
 	SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
@@ -20,14 +20,6 @@ BEGIN_SHADER_PARAMETER_STRUCT(FDeviceRGBMaterialParameters, )
 	SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<float2>, LedUVs)
 	SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<float4>, Colors)
 END_SHADER_PARAMETER_STRUCT()
-
-enum class EDeviceRGBBlendMode : uint8
-{
-	AlphaBlend,
-	Additive,
-	Multiply,
-	MAX,
-};
 
 class FDeviceRGBMaterialCS : public FMaterialShader
 {
@@ -69,7 +61,7 @@ public:
 
 IMPLEMENT_SHADER_TYPE(, FDeviceRGBMaterialCS, TEXT("/DeviceRGB/DeviceRGBMaterialCS.usf"), TEXT("MainCS"), SF_Compute);
 
-FDeviceRGBSceneViewExtension::FDeviceRGBSceneViewExtension(const FAutoRegister& AutoRegister, UDeviceRGBSubsystem* InEngineSubsystem) : FSceneViewExtensionBase(AutoRegister), EngineSubsystem(InEngineSubsystem)
+FDeviceRGBSceneViewExtension::FDeviceRGBSceneViewExtension(const FAutoRegister& AutoRegister, UDeviceRGBSubsystem* InDeviceRGBSubsystem) : FSceneViewExtensionBase(AutoRegister), DeviceRGBSubsystem(InDeviceRGBSubsystem)
 {
 	GetRendererModule().RegisterPersistentViewUniformBufferExtension(this);
 }
@@ -109,37 +101,41 @@ void GetMaterialInfo(
 	OutMaterialShaderMap = MaterialShaderMap;
 }
 
-BEGIN_SHADER_PARAMETER_STRUCT(FDeviceRGBReadbackBufferParameters, )
-RDG_BUFFER_ACCESS(Buffer, ERHIAccess::CopySrc)
-END_SHADER_PARAMETER_STRUCT()
-
-template <typename ExecuteLambdaType>
-void AddReadbackBufferPass(FRDGBuilder& GraphBuilder, FRDGEventName&& Name, FRDGBufferRef Buffer, ExecuteLambdaType&& ExecuteLambda)
+bool FDeviceRGBSceneViewExtension::IsActiveThisFrameInContext(FSceneViewExtensionContext& Context) const
 {
-	auto* PassParameters = GraphBuilder.AllocParameters<FDeviceRGBReadbackBufferParameters>();
-	PassParameters->Buffer = Buffer;
-	GraphBuilder.AddPass(MoveTemp(Name), PassParameters, ERDGPassFlags::Readback, MoveTemp(ExecuteLambda));
+	return DeviceRGBSubsystem &&
+		DeviceRGBSubsystem->GetCurrentGraphic().IsType<UMaterialInterface*>() &&
+		DeviceRGBSubsystem->GetCachedInfos().Num() > 0;
 }
 
-void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs)
+void FDeviceRGBSceneViewExtension::SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled)
+{
+	if (Pass == EPostProcessingPass::FXAA)
+	{
+		InOutPassCallbacks.Add(FAfterPassCallbackDelegate::CreateRaw(this, &FDeviceRGBSceneViewExtension::RenderLayers));
+	}
+}
+
+FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs)
 {
 	checkSlow(View.bIsViewInfo);
 
 	Inputs.Validate();
 
 	// This is safe, otherwise this function wouldn't execute
-	UMaterialInterface* MaterialInterface = EngineSubsystem->GetCurrentGraphic().Get<UMaterialInterface*>();
+	UMaterialInterface* MaterialInterface = DeviceRGBSubsystem->GetCurrentGraphic().Get<UMaterialInterface*>();
 	const FMaterialRenderProxy* Proxy = nullptr;
 	const FMaterial* Material = nullptr;
 	const FMaterialShaderMap* ShaderMap = nullptr;
 	GetMaterialInfo(MaterialInterface, View.GetFeatureLevel(), Material, Proxy, ShaderMap);
-	
+
+	FScreenPassTexture SceneColor(Inputs.GetInput(EPostProcessMaterialInput::SceneColor));
+
 	if (!ShaderMap)
-		return;
+		return SceneColor;
 
 	FDeviceRGBMaterialCS::FParameters* Parameters = GraphBuilder.AllocParameters<FDeviceRGBMaterialCS::FParameters>();
 
-	FScreenPassTexture SceneColor((*Inputs.SceneTextures)->SceneColorTexture);
 	const FScreenPassTextureViewport SceneColorTextureViewport(SceneColor);
 	FScreenPassRenderTarget SceneColorRenderTarget(SceneColor, ERenderTargetLoadAction::ELoad);
 	FRHISamplerState* PointClampSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();
@@ -163,12 +159,12 @@ void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& 
 	RDG_EVENT_SCOPE(GraphBuilder, "DeviceRGB");
 
 	FRDGBufferRef ColorsBuffer;
-	if (!UVData.IsValid())
+	if (!UVData.IsValid() || DeviceRGBSubsystem->bForceRefresh)
 	{
 		RDG_EVENT_SCOPE(GraphBuilder, "Setup");
-		
+
 		TArray<FVector2D> UVs;
-		for (const auto& LedInfo : EngineSubsystem->GetCachedInfos())
+		for (const auto& LedInfo : DeviceRGBSubsystem->GetCachedInfos())
 		{
 			UVs.Add(LedInfo.UV);
 		}
@@ -183,6 +179,8 @@ void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& 
 		Parameters->Colors = GraphBuilder.CreateUAV(ColorsBuffer);
 
 		GraphBuilder.QueueBufferExtraction(ColorsBuffer, &ColorData, ERHIAccess::UAVCompute);
+
+		DeviceRGBSubsystem->bForceRefresh = false;
 	}
 	else
 	{
@@ -190,85 +188,53 @@ void FDeviceRGBSceneViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& 
 		Parameters->LedUVs = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(UVData, ERDGBufferFlags::MultiFrame));
 		Parameters->Colors = GraphBuilder.CreateUAV(ColorsBuffer);
 	}
-	
-	const int32 NumItems = EngineSubsystem->GetCachedInfos().Num();
+
+	const int32 NumItems = DeviceRGBSubsystem->GetCachedInfos().Num();
 
 	FDeviceRGBMaterialCS::FPermutationDomain PermutationVector;
 	PermutationVector.Set<FDeviceRGBMaterialCS::FBlendModeDimension>(EDeviceRGBBlendMode::AlphaBlend);
 	auto Shader = ShaderMap->GetShader<FDeviceRGBMaterialCS>(PermutationVector);
-	
+
 	RDG_EVENT_SCOPE(GraphBuilder, "Layers");
 
 	ClearUnusedGraphResources(Shader, Parameters);
 
-	GraphBuilder.AddPass(RDG_EVENT_NAME("Layer 0 - %s", *MaterialInterface->GetName()), Parameters, 
+	GraphBuilder.AddPass(RDG_EVENT_NAME("Layer 0 - %s", *MaterialInterface->GetName()), Parameters,
 		ERDGPassFlags::Compute, [&View, Shader, Proxy, Parameters, NumItems](FRHICommandList& RHICmdList)
 	{
 		FDeviceRGBMaterialCS::SetParameters(RHICmdList, Shader, static_cast<const FViewInfo&>(View), Proxy, *Parameters);
 		FComputeShaderUtils::Dispatch(RHICmdList, Shader, *Parameters, FComputeShaderUtils::GetGroupCount(NumItems, 64));
 	});
 
-	GraphBuilder.QueueBufferExtraction(ColorsBuffer, &Data, ERHIAccess::CPURead);
-}
+	GraphBuilder.QueueBufferExtraction(ColorsBuffer, &ReadbackData, ERHIAccess::CPURead);
 
-void FDeviceRGBSceneViewExtension::SetupViewFamily(FSceneViewFamily& InViewFamily)
-{
-}
-
-void FDeviceRGBSceneViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView)
-{
-}
-
-void FDeviceRGBSceneViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewFamily)
-{
-}
-
-void FDeviceRGBSceneViewExtension::PreRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneViewFamily& InViewFamily)
-{
-}
-
-void FDeviceRGBSceneViewExtension::PreRenderView_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView)
-{
-}
-
-void FDeviceRGBSceneViewExtension::PostRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneViewFamily& InViewFamily)
-{
-}
-
-bool FDeviceRGBSceneViewExtension::IsActiveThisFrameInContext(FSceneViewExtensionContext& Context) const
-{
-	return EngineSubsystem->GetCurrentGraphic().IsType<UMaterialInterface*>();
-}
-
-void FDeviceRGBSceneViewExtension::PostRenderView_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView)
-{
+	return SceneColor;
 }
 
 void FDeviceRGBSceneViewExtension::EndFrame()
 {
 	ENQUEUE_RENDER_COMMAND(FPerformEndOfFrameReadback)([this](FRHICommandListImmediate& RHICmdList)
 	{
-		if (Data && Data->GetStructuredBufferRHI() && Data->GetStructuredBufferRHI()->IsValid())
+		if (ReadbackData && ReadbackData->GetStructuredBufferRHI() && ReadbackData->GetStructuredBufferRHI()->IsValid())
 		{
 			SCOPED_DRAW_EVENT(RHICmdList, DeviceRGB_DataReadback);
 			TArray<FLinearColor> ColorsTemp;
-			ColorsTemp.Init(FLinearColor::Black, EngineSubsystem->GetCachedInfos().Num());
+			ColorsTemp.Init(FLinearColor::Black, DeviceRGBSubsystem->GetCachedInfos().Num());
 
 			const uint32 Size = static_cast<uint32>(ColorsTemp.Num()) * ColorsTemp.GetTypeSize();
 
-			void* Source = RHICmdList.LockStructuredBuffer(Data->GetStructuredBufferRHI(), 0, Size, RLM_ReadOnly);
+			void* Source = RHICmdList.LockStructuredBuffer(ReadbackData->GetStructuredBufferRHI(), 0, Size, RLM_ReadOnly);
 			FMemory::Memcpy(ColorsTemp.GetData(), Source, Size);
-			RHICmdList.UnlockStructuredBuffer(Data->GetStructuredBufferRHI());
+			RHICmdList.UnlockStructuredBuffer(ReadbackData->GetStructuredBufferRHI());
 			
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, Colors = MoveTemp(ColorsTemp)]()
 			{
 				auto It = Colors.CreateConstIterator();
-				EngineSubsystem->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
+				DeviceRGBSubsystem->SetColors([&](IDeviceRGB* InDevice, TArray<FColor>& OutColors)
 				{
 					for (const auto& LEDInfo : InDevice->GetLEDInfos())
 					{
-						// I am still on the fence whether to convert to sRGB or not? When converting it gets brighter, which is a good thing generally.
-						OutColors.Add((*It).ToFColor(true));
+						OutColors.Add((*It).QuantizeRound());
 						++It;
 					}
 				});

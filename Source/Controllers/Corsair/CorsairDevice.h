@@ -1,11 +1,10 @@
 // Copyright(c) 2021 Viktor Pramberg
 #pragma once
 #include "CoreMinimal.h"
-#include "IDevice.h"
-#include "CorsairDeviceSDK.h"
+#include "IDeviceRGB.h"
 #include <CUESDK.h>
 
-class FCorsairDevice : public IDevice
+class FCorsairDevice : public IDeviceRGB
 {
 public:
 	FCorsairDevice(int32 InDeviceIndex);

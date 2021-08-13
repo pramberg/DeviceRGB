@@ -1,13 +1,13 @@
 // Copyright(c) 2021 Viktor Pramberg
-#include "RazerDeviceSDK.h"
+#include "RazerController.h"
 #include "RazerDevice.h"
-#include "IDevice.h"
+#include "IDeviceRGB.h"
 
 #include <GeneralProjectSettings.h>
 
 #define IMPORT_FUNC(InName) InName = reinterpret_cast<decltype(InName)>(FPlatformProcess::GetDllExport(SDKHandle, TEXT(#InName)))
 
-FRazerDeviceSDK::FRazerDeviceSDK()
+FRazerController::FRazerController()
 {
 	constexpr auto LibraryPath = TEXT("RzChromaSDK64.dll");
 
@@ -83,7 +83,7 @@ FRazerDeviceSDK::FRazerDeviceSDK()
 	}
 }
 
-FRazerDeviceSDK::~FRazerDeviceSDK()
+FRazerController::~FRazerController()
 {
 	if (SDKHandle)
 	{
@@ -93,21 +93,21 @@ FRazerDeviceSDK::~FRazerDeviceSDK()
 	}
 }
 
-int32 FRazerDeviceSDK::GetNumberOfDevices() const
+int32 FRazerController::GetNumberOfDevices() const
 {
 	return Devices.Num();
 }
 
-void FRazerDeviceSDK::FlushBuffers()
+void FRazerController::FlushBuffers()
 {
 	FlushBuffersImpl();
 }
 
-void FRazerDeviceSDK::FlushBuffersImpl()
+void FRazerController::FlushBuffersImpl()
 {
 }
 
-void FRazerDeviceSDK::ForEachDevice(TFunctionRef<void(IDevice*)> InFunction)
+void FRazerController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
 {
 	for (auto& Device : Devices)
 	{
@@ -115,12 +115,12 @@ void FRazerDeviceSDK::ForEachDevice(TFunctionRef<void(IDevice*)> InFunction)
 	}
 }
 
-bool FRazerDeviceSDK::IsValid() const
+bool FRazerController::IsValid() const
 {
 	return SDKHandle != nullptr;
 }
 
-bool FRazerDeviceSDK::IsDeviceConnected(RZDEVICEID InDeviceID) const
+bool FRazerController::IsDeviceConnected(RZDEVICEID InDeviceID) const
 {
 #if DEVICERGB_ENABLE_DEVICE_CHECKS
 	ChromaSDK::DEVICE_INFO_TYPE Info;
@@ -131,7 +131,7 @@ bool FRazerDeviceSDK::IsDeviceConnected(RZDEVICEID InDeviceID) const
 #endif
 }
 
-bool FRazerDeviceSDK::HasAnyKeyboard() const
+bool FRazerController::HasAnyKeyboard() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::BLACKWIDOW_CHROMA) ||
@@ -149,7 +149,7 @@ bool FRazerDeviceSDK::HasAnyKeyboard() const
 		);
 }
 
-bool FRazerDeviceSDK::HasAnyMouse() const
+bool FRazerController::HasAnyMouse() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::DEATHADDER_CHROMA) ||
@@ -164,7 +164,7 @@ bool FRazerDeviceSDK::HasAnyMouse() const
 		);
 }
 
-bool FRazerDeviceSDK::HasAnyHeadset() const
+bool FRazerController::HasAnyHeadset() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::KRAKEN71_CHROMA) ||
@@ -174,14 +174,14 @@ bool FRazerDeviceSDK::HasAnyHeadset() const
 		);
 }
 
-bool FRazerDeviceSDK::HasAnyMousepad() const
+bool FRazerController::HasAnyMousepad() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::FIREFLY_CHROMA)
 		);
 }
 
-bool FRazerDeviceSDK::HasAnyKeypad() const
+bool FRazerController::HasAnyKeypad() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::TARTARUS_CHROMA) ||
@@ -189,7 +189,7 @@ bool FRazerDeviceSDK::HasAnyKeypad() const
 		);
 }
 
-bool FRazerDeviceSDK::HasAnyChromaLink() const
+bool FRazerController::HasAnyChromaLink() const
 {
 	return (
 		IsDeviceConnected(ChromaSDK::NOMMO_CHROMA) ||

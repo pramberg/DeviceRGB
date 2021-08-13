@@ -1,8 +1,8 @@
 // Copyright(c) 2021 Viktor Pramberg
 #pragma once
 #include "CoreMinimal.h"
-#include "IDevice.h"
-#include "RazerDeviceSDK.h"
+#include "RazerController.h"
+#include "IDeviceRGB.h"
 #include <array>
 
 template<ERazerDeviceType DeviceType> int32 GetDeviceWidth() { return 0; }
@@ -71,10 +71,10 @@ template<> FVector2D GetUV<ERazerDeviceType::Mousepad>(const FIntPoint& InPositi
 
 // This is a template so we can get the correct function ptr at compile time
 template<ERazerDeviceType DeviceType>
-class FRazerDevice : public IDevice
+class FRazerDevice : public IDeviceRGB
 {
 public:
-	FRazerDevice(FRazerDeviceSDK* InSDK) : SDK(InSDK)
+	FRazerDevice(FRazerController* InSDK) : SDK(InSDK)
 	{
 		const int32 DeviceWidth = GetDeviceWidth<DeviceType>();
 		const int32 DeviceHeight = GetDeviceHeight<DeviceType>();
@@ -176,5 +176,5 @@ private:
 	int32 DeviceIndex;
 	int32 NumLEDs;
 
-	FRazerDeviceSDK* SDK;
+	FRazerController* SDK;
 };

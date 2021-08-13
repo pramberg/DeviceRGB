@@ -11,7 +11,7 @@ enum class EDeviceRGBType : uint8
 	Headset,
 };
 
-class IDeviceSDK;
+class IDeviceRGBController;
 
 // Most important info
 struct FDeviceLEDInfo
@@ -28,12 +28,12 @@ public:
 	FVector2D Location;
 };
 
-class IDevice
+class IDeviceRGB
 {
 public:
-	virtual ~IDevice() = default;
+	virtual ~IDeviceRGB() = default;
 	virtual int32 GetNumLEDs() const = 0;
-	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true);
+	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true) = 0;
 
 	/**
 	 * Gets the LED infos.

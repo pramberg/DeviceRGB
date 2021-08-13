@@ -16,44 +16,33 @@ class FRDGTexture;
 class FDeviceRGBSceneViewExtension : public FSceneViewExtensionBase, public IPersistentViewUniformBufferExtension
 {
 public:
-	FDeviceRGBSceneViewExtension(const FAutoRegister& AutoRegister, UDeviceRGBSubsystem* InEngineSubsystem);
+	FDeviceRGBSceneViewExtension(const FAutoRegister& AutoRegister, UDeviceRGBSubsystem* InDeviceRGBSubsystem);
 
 	//~ Begin FSceneViewExtensionBase Interface
-	virtual void PrePostProcessPass_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessingInputs& Inputs) override;
-
-	virtual void SetupViewFamily(FSceneViewFamily& InViewFamily) override;
-
-
-	virtual void SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView) override;
-
-
-	virtual void BeginRenderViewFamily(FSceneViewFamily& InViewFamily) override;
-
-
-	virtual void PreRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneViewFamily& InViewFamily) override;
-
-
-	virtual void PreRenderView_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView) override;
-
-
-	virtual void PostRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneViewFamily& InViewFamily) override;
-
+	virtual void SetupViewFamily(FSceneViewFamily& InViewFamily) override {};
+	virtual void SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView) override {};
+	virtual void BeginRenderViewFamily(FSceneViewFamily& InViewFamily) override {};
+	virtual void PreRenderViewFamily_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneViewFamily& InViewFamily) override {};
+	virtual void PreRenderView_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView) override {};
 
 	virtual bool IsActiveThisFrameInContext(FSceneViewExtensionContext& Context) const override;
+	virtual void SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) override;
+	//~ End FSceneViewExtensionBase Interface
+	
+	FScreenPassTexture RenderLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs);
 
-
-	virtual void PostRenderView_RenderThread(FRHICommandListImmediate& RHICmdList, FSceneView& InView) override;
-
-
+	/** Performs the readback from the GPU after the graph builder has executed. */
 	virtual void EndFrame() override;
 
-	//~ End FSceneViewExtensionBase Interface
-
 private:
-	UDeviceRGBSubsystem* EngineSubsystem;
+	UDeviceRGBSubsystem* DeviceRGBSubsystem;
 
-	TRefCountPtr<class FRDGPooledBuffer> Data;
+	/** Buffer to read back from after the frame finishes */
+	TRefCountPtr<class FRDGPooledBuffer> ReadbackData;
 
+	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> UVData;
+
+	/** Persistent buffer for the colors */
 	TRefCountPtr<class FRDGPooledBuffer> ColorData;
 };

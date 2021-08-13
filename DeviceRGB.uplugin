@@ -18,7 +18,8 @@
 		{
 			"Name": "DeviceRGB",
 			"Type": "Runtime",
-			"LoadingPhase": "PostConfigInit"
+			"LoadingPhase": "PostConfigInit",
+			"WhitelistPlatforms": [ "Win64" ]
 		}
 	]
 }

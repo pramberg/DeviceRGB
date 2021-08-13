@@ -1,11 +1,11 @@
 // Copyright(c) 2021 Viktor Pramberg
-#include "CorsairDeviceSDK.h"
+#include "CorsairController.h"
 #include <Interfaces/IPluginManager.h>
 #include "CorsairDevice.h"
 
 #include <CUESDK.h>
 
-FCorsairDeviceSDK::FCorsairDeviceSDK()
+FCorsairController::FCorsairController()
 {
 	const FString BaseDir = IPluginManager::Get().FindPlugin("DeviceRGB")->GetBaseDir();
 	const FString LibraryPath = FPaths::Combine(*BaseDir, TEXT("Source/ThirdParty/CUESDK/redist/x64/CUESDK.x64_2017.dll"));
@@ -13,7 +13,6 @@ FCorsairDeviceSDK::FCorsairDeviceSDK()
 	SDKHandle = FPlatformProcess::GetDllHandle(*LibraryPath);
 	if (!SDKHandle)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to find CUE DLL!!!!"));
 		return;
 	}
 
@@ -21,6 +20,7 @@ FCorsairDeviceSDK::FCorsairDeviceSDK()
 	if (CorsairGetLastError())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to connect to Corsair CUE service."));
+		FPlatformProcess::FreeDllHandle(SDKHandle);
 		SDKHandle = nullptr;
 		return;
 	}
@@ -31,23 +31,23 @@ FCorsairDeviceSDK::FCorsairDeviceSDK()
 	}
 }
 
-FCorsairDeviceSDK::~FCorsairDeviceSDK()
+FCorsairController::~FCorsairController()
 {
 	FPlatformProcess::FreeDllHandle(SDKHandle);
 	SDKHandle = nullptr;
 }
 
-int32 FCorsairDeviceSDK::GetNumberOfDevices() const
+int32 FCorsairController::GetNumberOfDevices() const
 {
 	return CorsairGetDeviceCount();
 }
 
-void FCorsairDeviceSDK::FlushBuffers()
+void FCorsairController::FlushBuffers()
 {
 	FlushBuffersImpl();
 }
 
-void FCorsairDeviceSDK::FlushBuffersImpl()
+void FCorsairController::FlushBuffersImpl()
 {
 	CorsairSetLedsColorsFlushBufferAsync([](void* Context, bool Result, CorsairError Error)
 	{
@@ -58,7 +58,7 @@ void FCorsairDeviceSDK::FlushBuffersImpl()
 	}, nullptr);
 }
 
-void FCorsairDeviceSDK::ForEachDevice(TFunctionRef<void(IDevice*)> InFunction)
+void FCorsairController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
 {
 	for (auto& Device : Devices)
 	{
@@ -66,7 +66,7 @@ void FCorsairDeviceSDK::ForEachDevice(TFunctionRef<void(IDevice*)> InFunction)
 	}
 }
 
-bool FCorsairDeviceSDK::IsValid() const
+bool FCorsairController::IsValid() const
 {
 	return SDKHandle != nullptr;
 }

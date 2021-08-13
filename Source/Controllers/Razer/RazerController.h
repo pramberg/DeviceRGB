@@ -1,7 +1,7 @@
 // Copyright(c) 2021 Viktor Pramberg
 #pragma once
 #include "CoreMinimal.h"
-#include "IDeviceSDK.h"
+#include "IDeviceRGBController.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -14,7 +14,7 @@
 // Device queries fail when testing with Razer's emulator, so this macro makes it possible to override those checks.
 #define DEVICERGB_ENABLE_DEVICE_CHECKS 0
 
-class IDevice;
+class IDeviceRGB;
 
 // Because Razer's API is kind of silly in combination with DeviceRGB's design; we create one device of each type, and just call its "Create*Device*Effect()" in SetColors
 enum class ERazerDeviceType : uint8
@@ -28,18 +28,18 @@ enum class ERazerDeviceType : uint8
 	ChromaLink,
 };
 
-class FRazerDeviceSDK : public IDeviceSDK
+class FRazerController : public IDeviceRGBController
 {
 public:
-	FRazerDeviceSDK();
-	virtual ~FRazerDeviceSDK() override;
+	FRazerController();
+	virtual ~FRazerController() override;
 
 	virtual int32 GetNumberOfDevices() const override;
 	virtual void FlushBuffers() override;
 
 	static void FlushBuffersImpl();
 
-	virtual void ForEachDevice(TFunctionRef<void(IDevice*)> InFunction) override;
+	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
 
 	virtual bool IsValid() const override;
 private:
@@ -106,5 +106,5 @@ private:
 #endif
 
 	void* SDKHandle = nullptr;
-	TArray<TUniquePtr<IDevice>> Devices;
+	TArray<TUniquePtr<IDeviceRGB>> Devices;
 };

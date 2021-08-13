@@ -1,25 +1,25 @@
 // Copyright(c) 2021 Viktor Pramberg
 #pragma once
 #include "CoreMinimal.h"
-#include "IDeviceSDK.h"
+#include "IDeviceRGBController.h"
 
-class IDevice;
+class IDeviceRGB;
 
-class FCorsairDeviceSDK : public IDeviceSDK
+class FCorsairController : public IDeviceRGBController
 {
 public:
-	FCorsairDeviceSDK();
-	virtual ~FCorsairDeviceSDK() override;
+	FCorsairController();
+	virtual ~FCorsairController() override;
 
 	virtual int32 GetNumberOfDevices() const override;
 	virtual void FlushBuffers() override;
 
 	static void FlushBuffersImpl();
 
-	virtual void ForEachDevice(TFunctionRef<void(IDevice*)> InFunction) override;
+	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
 
 	virtual bool IsValid() const override;
 private:
 	void* SDKHandle = nullptr;
-	TArray<TUniquePtr<IDevice>> Devices;
+	TArray<TUniquePtr<IDeviceRGB>> Devices;
 };
