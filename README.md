@@ -3,5 +3,5 @@
 
 Use materials to control RGB devices.
 
-# Getting Started
+## Getting Started
 Take a look at the [wiki!](https://github.com/pramberg/DeviceRGB/wiki)
