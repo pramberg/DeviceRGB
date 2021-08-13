@@ -20,6 +20,12 @@
 			"Type": "Runtime",
 			"LoadingPhase": "PostConfigInit",
 			"WhitelistPlatforms": [ "Win64" ]
+		},
+		{
+			"Name": "DeviceRGBEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"WhitelistPlatforms": [ "Win64" ]
 		}
 	]
 }
