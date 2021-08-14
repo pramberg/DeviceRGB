@@ -3,8 +3,6 @@
 #include "Modules/ModuleManager.h"
 #include "DeviceRGBSubsystem.h"
 
-class IDeviceRGBController;
-
 class DEVICERGB_API FDeviceRGBModule : public IModuleInterface
 {
 public:
