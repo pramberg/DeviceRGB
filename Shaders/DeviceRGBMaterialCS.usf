@@ -20,7 +20,7 @@ void MainCS(uint3 ThreadID : SV_DispatchThreadID)
 		Parameters.TexCoords[CoordinateIndex] = UV;
 	}
 #endif
-    Parameters.VertexColor = 1.0f;
+    Parameters.VertexColor = Colors[ThreadID.x];
 
     // Need to remap for the generated code to make sense...
     float4 SvPosition = float4(UV * View_ViewSizeAndInvSize.xy, 1e-18f, 1.0f);
