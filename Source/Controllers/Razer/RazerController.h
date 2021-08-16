@@ -31,18 +31,18 @@ enum class ERazerDeviceType : uint8
 class FRazerController : public IDeviceRGBController
 {
 public:
-	FRazerController();
 	virtual ~FRazerController() override;
 
-	virtual int32 GetNumberOfDevices() const override;
-	virtual void FlushBuffers() override;
+	static TUniquePtr<FRazerController> Construct();
 
-	static void FlushBuffersImpl();
+	virtual int32 GetNumberOfDevices() const override;
+	virtual void FlushBuffers() override {}
 
 	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
+	virtual void* GetDLLHandle() const override { return SDKHandle; }
 
-	virtual bool IsValid() const override;
 private:
+	FRazerController();
 
 #if PLATFORM_WINDOWS
 	using INIT = RZRESULT(*)(void);
@@ -75,24 +75,6 @@ private:
 	DELETEEFFECT DeleteEffect = nullptr;
 	QUERYDEVICE QueryDevice = nullptr;
 
-	bool VerifySDK() const 
-	{
-		return ensure(
-			Init &&
-			InitSDK &&
-			UnInit &&
-			CreateEffect &&
-			CreateKeypadEffect &&
-			CreateMouseEffect &&
-			CreateHeadsetEffect &&
-			CreateMousepadEffect &&
-			CreateKeypadEffect &&
-			SetEffect &&
-			DeleteEffect &&
-			QueryDevice
-		);
-	}
-
 	// Used to check whether to create devices
 	bool IsDeviceConnected(RZDEVICEID InDeviceID) const;
 	bool HasAnyKeyboard() const;
@@ -101,6 +83,8 @@ private:
 	bool HasAnyMousepad() const;
 	bool HasAnyKeypad() const;
 	bool HasAnyChromaLink() const;
+
+	void TryAddDevices();
 
 	template<ERazerDeviceType DeviceType> friend class FRazerDevice;
 #endif

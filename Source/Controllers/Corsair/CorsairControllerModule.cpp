@@ -8,7 +8,7 @@ class FCorsairControllerModule : public IModuleInterface
 public:
 	virtual void StartupModule() override
 	{
-		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController<FCorsairController>();
+		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController(FCorsairController::Construct());
 	}
 
 	virtual void ShutdownModule() override

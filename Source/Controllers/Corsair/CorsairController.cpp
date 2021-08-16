@@ -11,30 +11,35 @@ FCorsairController::FCorsairController()
 	const FString LibraryPath = FPaths::Combine(*BaseDir, TEXT("Source/ThirdParty/CUESDK/redist/x64/CUESDK.x64_2017.dll"));
 
 	SDKHandle = FPlatformProcess::GetDllHandle(*LibraryPath);
-	if (!SDKHandle)
-	{
-		return;
-	}
-
-	CorsairPerformProtocolHandshake();
-	if (CorsairGetLastError())
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to connect to Corsair CUE service."));
-		FPlatformProcess::FreeDllHandle(SDKHandle);
-		SDKHandle = nullptr;
-		return;
-	}
-
-	for (int32 DeviceIndex = 0; DeviceIndex < GetNumberOfDevices(); DeviceIndex++)
-	{
-		Devices.Add(MakeUnique<FCorsairDevice>(DeviceIndex));
-	}
 }
 
 FCorsairController::~FCorsairController()
 {
 	FPlatformProcess::FreeDllHandle(SDKHandle);
 	SDKHandle = nullptr;
+}
+
+TUniquePtr<FCorsairController> FCorsairController::Construct()
+{
+	auto Controller = TUniquePtr<FCorsairController>(new FCorsairController());
+	if (!Controller->GetDLLHandle())
+	{
+		return nullptr;
+	}
+
+	CorsairPerformProtocolHandshake();
+	if (CorsairGetLastError())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to connect to Corsair CUE service."));
+		return nullptr;
+	}
+
+	for (int32 DeviceIndex = 0; DeviceIndex < Controller->GetNumberOfDevices(); DeviceIndex++)
+	{
+		Controller->Devices.Add(MakeUnique<FCorsairDevice>(DeviceIndex));
+	}
+
+	return MoveTemp(Controller);
 }
 
 int32 FCorsairController::GetNumberOfDevices() const
@@ -64,9 +69,4 @@ void FCorsairController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunctio
 	{
 		InFunction(Device.Get());
 	}
-}
-
-bool FCorsairController::IsValid() const
-{
-	return SDKHandle != nullptr;
 }

@@ -8,8 +8,8 @@ class IDeviceRGB;
 class FCorsairController : public IDeviceRGBController
 {
 public:
-	FCorsairController();
 	virtual ~FCorsairController() override;
+	static TUniquePtr<FCorsairController> Construct();
 
 	virtual int32 GetNumberOfDevices() const override;
 	virtual void FlushBuffers() override;
@@ -18,8 +18,11 @@ public:
 
 	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
 
-	virtual bool IsValid() const override;
+	virtual void* GetDLLHandle() const override { return SDKHandle; }
+
 private:
+	FCorsairController();
+
 	void* SDKHandle = nullptr;
 	TArray<TUniquePtr<IDeviceRGB>> Devices;
 };

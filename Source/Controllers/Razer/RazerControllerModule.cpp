@@ -8,7 +8,7 @@ class FRazerControllerModule : public IModuleInterface
 public:
 	virtual void StartupModule() override
 	{
-		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController<FRazerController>();
+		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController(FRazerController::Construct());
 	}
 
 	virtual void ShutdownModule() override

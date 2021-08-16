@@ -30,5 +30,6 @@ public class RazerController : ModuleRules
 
 		PublicIncludePaths.Add(Path.Combine(SDKDir, "include"));
 		PublicDelayLoadDLLs.Add("RzChromaSDK64.dll");
+		RuntimeDependencies.Add("$(ProjectDir)/Binaries/Win64/ChromaAppInfo.xml", Path.Combine(SDKDir, "ChromaAppInfo.xml"), StagedFileType.SystemNonUFS);
 	}
 }

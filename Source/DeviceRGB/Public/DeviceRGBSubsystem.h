@@ -88,13 +88,11 @@ public:
 		bForceRefresh = true;
 	}
 
-	template<typename T>
-	void RegisterController()
+	void RegisterController(TUniquePtr<IDeviceRGBController>&& InController)
 	{
-		auto TempController = MakeUnique<T>();
-		if (TempController->IsValid())
+		if (InController)
 		{
-			SupportedSDKs.Add(MoveTemp(TempController));
+			SupportedSDKs.Add(MoveTemp(InController));
 			MarkCacheDirty();
 		}
 	}
