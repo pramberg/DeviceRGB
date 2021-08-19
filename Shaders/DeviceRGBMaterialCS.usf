@@ -4,12 +4,27 @@
 
 StructuredBuffer<float2> LedUVs;
 RWStructuredBuffer<float4> Colors;
+uint NumItems;
+
+#if DEVICERGB_INDEX_BUFFER
+StructuredBuffer<uint> IndexBuffer;
+uint IndexBufferStart;
+#endif
 
 [numthreads(THREADGROUPSIZE_X, THREADGROUPSIZE_Y, THREADGROUPSIZE_Z)]
 void MainCS(uint3 ThreadID : SV_DispatchThreadID)
 {
+    if (ThreadID.x >= NumItems)
+        return;
+
+#if DEVICERGB_INDEX_BUFFER
+    uint Index = IndexBuffer[ThreadID.x + IndexBufferStart];
+#else
+    uint Index = ThreadID.x;
+#endif
+
     ResolvedView = ResolveView();
-    float2 UV = LedUVs[ThreadID.x];
+    float2 UV = LedUVs[Index];
     
     FMaterialPixelParameters Parameters = MakeInitializedMaterialPixelParameters();
 
@@ -20,7 +35,7 @@ void MainCS(uint3 ThreadID : SV_DispatchThreadID)
 		Parameters.TexCoords[CoordinateIndex] = UV;
 	}
 #endif
-    Parameters.VertexColor = Colors[ThreadID.x];
+    Parameters.VertexColor = Colors[Index];
 
     // Need to remap for the generated code to make sense...
     float4 SvPosition = float4(UV * View_ViewSizeAndInvSize.xy, 1e-18f, 1.0f);
@@ -33,10 +48,10 @@ void MainCS(uint3 ThreadID : SV_DispatchThreadID)
     const float4 Output = float4(Emissive, Alpha);
 
 #if DEVICERGB_BLEND_MODE == 0
-	Colors[ThreadID.x] = lerp(Colors[ThreadID.x], Output, Alpha);
+	Colors[Index] = lerp(Colors[Index], Output, Alpha);
 #elif DEVICERGB_BLEND_MODE == 1
-	Colors[ThreadID.x] += Output;
+	Colors[Index] += Output;
 #elif DEVICERGB_BLEND_MODE == 2
-	Colors[ThreadID.x] *= Output;
+	Colors[Index] *= Output;
 #endif
 }

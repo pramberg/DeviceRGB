@@ -14,11 +14,13 @@ public:
 	virtual FVector2D GetPhysicalSize() const override;
 	virtual EDeviceRGBType GetType() const override;
 
+	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) override;
 private:
 	FVector2D GetDeviceSize(const CorsairLedPositions* InPositions);
 
 	TArray<FDeviceLEDInfo> LEDInfos;
 	TArray<CorsairLedColor> Colors;
+	TArray<FDeviceRGBAdditionalLEDInfo> AdditionalInfos;
 	FVector2D DeviceSize;
 	EDeviceRGBType Type;
 	int32 DeviceIndex;

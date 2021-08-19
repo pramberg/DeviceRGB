@@ -1,63 +1,90 @@
 // Copyright(c) 2021 Viktor Pramberg
 #include "DeviceRGBSubsystem.h"
-#include <Engine/Texture2D.h>
-#include <Materials/MaterialInterface.h>
-#include <algorithm>
 #include "DeviceRGBViewExtension.h"
-#include <Engine/TextureRenderTarget2D.h>
-#include <Components/SceneCaptureComponent2D.h>
-#include <UnrealClient.h>
-#include <TextureResource.h>
+#include "DeviceRGBSettings.h"
 #include "IDeviceRGB.h"
 
-// Need to be able to make layers where material only affects that layer. So say a base layer has one material, then another material is assigned to WASD as another layer.
-void UDeviceRGBSubsystem::SetMaterial(UMaterialInterface* InMaterial, const FDeviceRGBLayerInfo& InInfo)
-{
-	if (!InMaterial)
-	{
-		return;
-	}
+#include <Engine/Texture2D.h>
+#include <Materials/MaterialInterface.h>
+#include <Materials/MaterialInstanceDynamic.h>
+#include <Algo/Transform.h>
 
-	CurrentGraphic.Set<UMaterialInterface*>(InMaterial);
+bool UDeviceRGBSubsystem::AddLayer(const FDeviceRGBLayerInfo& InInfo)
+{
+	if (auto Cache = CreateGraphicsCache(InInfo))
+	{
+		GraphicsCaches.Add(Cache.GetValue());
+		SetEnabled(true);
+		MarkCacheDirty();
+		return true;
+	}
+	return false;
 }
 
-// This should probably be done using a default material, so we can do fancy features in the shader, like supersampling, and benefit from that when using textures too. Just make sure to only update the colors once, since they are persistent.
-void UDeviceRGBSubsystem::SetTexture(UTexture2D* InTexture, const FDeviceRGBLayerInfo& InInfo)
+void UDeviceRGBSubsystem::RemoveLayer()
 {
-	/*if (!InTexture)
-		return;
-
-	TextureCompressionSettings OldCompressionSettings = InTexture->CompressionSettings; TextureMipGenSettings OldMipGenSettings = InTexture->MipGenSettings; bool OldSRGB = InTexture->SRGB;
-
-	InTexture->CompressionSettings = TextureCompressionSettings::TC_VectorDisplacementmap;
-	InTexture->MipGenSettings = TextureMipGenSettings::TMGS_NoMipmaps;
-	InTexture->SRGB = false;
-	InTexture->UpdateResource();
-
-	const FColor* FormatedImageData = static_cast<const FColor*>(InTexture->PlatformData->Mips[0].BulkData.LockReadOnly());
-
-	for (auto& SDK : SupportedSDKs)
+	if (GraphicsCaches.Num() == 0)
 	{
-		SDK->SetColors([&](IDevice* InDevice, TArray<FColor>& OutColors)
-		{
-			for (const auto& LEDInfo : InDevice->GetLEDInfos())
-			{
-				int32 X = FMath::Floor(LEDInfo.UV.X * InTexture->GetSizeX());
-				int32 Y = FMath::Floor(LEDInfo.UV.Y * InTexture->GetSizeY());
-				FColor PixelColor = FormatedImageData[Y * InTexture->GetSizeX() + X];
-				OutColors.Add(PixelColor);
-			}
-		});
+		return;
 	}
 
-	InTexture->PlatformData->Mips[0].BulkData.Unlock();
+	GraphicsCaches.RemoveAt(GraphicsCaches.Num() - 1);
+	MarkCacheDirty();
 
-	InTexture->CompressionSettings = OldCompressionSettings;
-	InTexture->MipGenSettings = OldMipGenSettings;
-	InTexture->SRGB = OldSRGB;
-	InTexture->UpdateResource();
-	
-	CurrentGraphic.Set<UTexture2D*>(InTexture);*/
+	if (GraphicsCaches.Num() == 0)
+	{
+		SetEnabled(false);
+	}
+}
+
+void UDeviceRGBSubsystem::RemoveAllLayers()
+{
+	GraphicsCaches.Empty();
+	MarkCacheDirty();
+	SetEnabled(false);
+}
+
+bool UDeviceRGBSubsystem::InsertLayer(int32 InIndex, const FDeviceRGBLayerInfo& InInfo)
+{
+	if (auto Cache = CreateGraphicsCache(InInfo))
+	{
+		GraphicsCaches.Insert(Cache.GetValue(), InIndex);
+		SetEnabled(true);
+		MarkCacheDirty();
+		return true;
+	}
+	return false;
+}
+
+bool UDeviceRGBSubsystem::ReplaceLayer(int32 InIndex, const FDeviceRGBLayerInfo& InInfo)
+{
+	if (!GraphicsCaches.IsValidIndex(InIndex))
+	{
+		return false;
+	}
+
+	if (auto Cache = CreateGraphicsCache(InInfo))
+	{
+		GraphicsCaches[InIndex] = Cache.GetValue();
+		SetEnabled(true);
+		MarkCacheDirty();
+		return true;
+	}
+	return false;
+}
+
+void UDeviceRGBSubsystem::SetEnabled(bool bEnabled)
+{
+	if (bIsEnabled == bEnabled)
+	{
+		return;
+	}
+
+	bIsEnabled = bEnabled;
+	for (auto& SDK : SupportedSDKs)
+	{
+		SDK->SetEnabled(bIsEnabled);
+	}
 }
 
 void UDeviceRGBSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -74,16 +101,17 @@ void UDeviceRGBSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 #endif // DEVICERGB_CONTROLLERS_TO_LOAD
 
-	for (auto& SDK : SupportedSDKs)
+	TInterval<int32> CurrentRange{ 0, 0 };
+	ForEachDevice([&](IDeviceRGB* InDevice)
 	{
-		SDK->ForEachDevice([&](IDeviceRGB* InDevice)
+		CurrentRange.Min = CurrentRange.Max;
+		for (const auto& LEDInfo : InDevice->GetLEDInfos())
 		{
-			for (const auto& LEDInfo : InDevice->GetLEDInfos())
-			{
-				CachedLEDInfos.Add(LEDInfo);
-			}
-		});
-	}
+			CachedLEDInfos.Add(LEDInfo);
+			CurrentRange.Max++;
+		}
+		DeviceRanges.Add(CurrentRange);
+	});
 
 	ViewExtension = FSceneViewExtensions::NewExtension<FDeviceRGBSceneViewExtension>(this);
 }
@@ -114,4 +142,100 @@ void UDeviceRGBSubsystem::SetColors(TFunctionRef<void(IDeviceRGB*, TArray<FColor
 		});
 		SDK->FlushBuffers();
 	}
+}
+
+void UDeviceRGBSubsystem::MarkCacheDirty()
+{
+	bForceRefresh = true;
+}
+
+void UDeviceRGBSubsystem::RegisterController(TUniquePtr<IDeviceRGBController>&& InController)
+{
+	if (InController)
+	{
+		SupportedSDKs.Add(MoveTemp(InController));
+		MarkCacheDirty();
+	}
+}
+
+void UDeviceRGBSubsystem::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
+{
+	for (auto& SDK : SupportedSDKs)
+	{
+		SDK->ForEachDevice(InFunction);
+	}
+}
+
+void UDeviceRGBSubsystem::ForEachDevice(TFunctionRef<void(IDeviceRGB*, int32)> InFunction)
+{
+	int32 i = 0;
+	for (auto& SDK : SupportedSDKs)
+	{
+		SDK->ForEachDevice([&](IDeviceRGB* InDevice)
+		{
+			InFunction(InDevice, i++);
+		});
+	}
+}
+
+TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const FDeviceRGBLayerInfo& InInfo)
+{
+	if (!InInfo.Graphic)
+	{
+		return TOptional<FDeviceRGBGraphicCache>();
+	}
+
+	FDeviceRGBGraphicCache Cache;
+	if (UMaterialInterface* Material = Cast<UMaterialInterface>(InInfo.Graphic))
+	{
+		Cache.Material.Reset(Material);
+	}
+	else if (UTexture2D* Texture = Cast<UTexture2D>(InInfo.Graphic))
+	{
+		UMaterialInterface* BaseMaterial = GetDefault<UDeviceRGBSettings>()->TextureMaterial.LoadSynchronous();
+
+		const FName Name(FString::Printf(TEXT("%s(%s)"), *BaseMaterial->GetName(), *Texture->GetName()));
+		UMaterialInstanceDynamic* CreatedMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr, Name);
+
+		CreatedMaterial->SetTextureParameterValue(TEXT("Texture"), Texture);
+
+		Cache.Material.Reset(CreatedMaterial);
+	}
+	else
+	{
+		ensureAlwaysMsgf(false, TEXT("UDeviceRGBSubsystem::InitializeGraphicsCache() called with invalid graphic: [%s]. DeviceRGB only supports Materials and Texture2D!"), *InInfo.Graphic->GetName());
+		return TOptional<FDeviceRGBGraphicCache>();
+	}
+	Cache.BlendMode = InInfo.BlendMode;
+
+	if (InInfo.DeviceTypes != 0)
+	{
+		ForEachDevice([this, &Cache, Type = InInfo.DeviceTypes](IDeviceRGB* InDevice, int32 InCurrentIndex)
+		{
+			if (Type & (1 << static_cast<uint8>(InDevice->GetType())))
+			{
+				const TInterval<int32>& Interval = DeviceRanges[InCurrentIndex];
+				for (int32 i = Interval.Min; i < Interval.Max; i++)
+				{
+					Cache.Indices.Add(i);
+				}
+			}
+		});
+	}
+
+	if (InInfo.Keys.Num())
+	{
+		ForEachDevice([this, &Cache, &InInfo](IDeviceRGB* InDevice, int32 InCurrentIndex)
+		{
+			const auto Indices = InDevice->GetIndicesForKeys(InInfo.Keys);
+			if (Indices.Num())
+			{
+				const int32 DeviceStartIndex = DeviceRanges[InCurrentIndex].Min;
+				Cache.Indices.Reserve(Indices.Num());
+				Algo::Transform(Indices, Cache.Indices, [DeviceStartIndex](int32 DeviceIndex) { return DeviceStartIndex + DeviceIndex; });
+			}
+		});
+	}
+
+	return Cache;
 }

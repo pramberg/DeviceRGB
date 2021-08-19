@@ -1,7 +1,9 @@
 // Copyright(c) 2021 Viktor Pramberg
 #pragma once
 #include "CoreMinimal.h"
+#include "IDeviceRGB.generated.h"
 
+UENUM(BlueprintType, meta = (Bitflags))
 enum class EDeviceRGBType : uint8
 {
 	Keyboard,
@@ -9,7 +11,9 @@ enum class EDeviceRGBType : uint8
 	Mouse,
 	Mousepad,
 	Headset,
+	Other,
 };
+ENUM_CLASS_FLAGS(EDeviceRGBType)
 
 class IDeviceRGBController;
 
@@ -20,7 +24,7 @@ struct FDeviceLEDInfo
 	FVector2D UV;
 };
 
-struct FAdditionalDeviceLEDInfo
+struct FDeviceRGBAdditionalLEDInfo
 {
 public:
 	FKey Key;
@@ -47,4 +51,6 @@ public:
 	 */
 	virtual FVector2D GetPhysicalSize() const = 0;
 	virtual EDeviceRGBType GetType() const = 0;
+
+	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) = 0;
 };

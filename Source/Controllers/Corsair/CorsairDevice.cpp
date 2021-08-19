@@ -3,6 +3,8 @@
 #include "CorsairController.h"
 #include <CUESDK.h>
 #include <algorithm>
+#include "CorsairKeyConverter.h"
+
 
 FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 {
@@ -15,6 +17,7 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 	NumLEDs = Positions->numberOfLed;
 	Colors.Reserve(NumLEDs);
 	LEDInfos.Reserve(NumLEDs);
+	AdditionalInfos.Reserve(NumLEDs);
 	
 	DeviceSize = GetDeviceSize(Positions);
 	const float AspectRatio = FMath::Max(DeviceSize.X, DeviceSize.Y) / FMath::Min(DeviceSize.X, DeviceSize.Y);
@@ -24,21 +27,61 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 
 		const FVector2D UV = [this, &CurrentLED, AspectRatio]() -> FVector2D
 		{
-			auto asdf = FVector2D
+			auto LedCenter = FVector2D
 			{
 				(float)(CurrentLED.left - CurrentLED.width * 0.5),
 				(float)(CurrentLED.top - CurrentLED.height * 0.5)
 			} / DeviceSize;
-			asdf.X = FMath::Clamp(asdf.X, 0.0f, 1.0f);
-			asdf.Y = FMath::Clamp(asdf.Y, 0.0f, 1.0f);
-			return asdf;
+			LedCenter.X = FMath::Clamp(LedCenter.X, 0.0f, 1.0f);
+			LedCenter.Y = FMath::Clamp(LedCenter.Y, 0.0f, 1.0f);
+			return LedCenter;
 		}();
 
 		LEDInfos.Add(FDeviceLEDInfo{ UV });
 		Colors.Add({ CurrentLED.ledId, 0, 0, 0});
+		AdditionalInfos.Add({ FCorsairKeyConverter::ToFKey(CurrentLED.ledId) });
 	}
 
-	Type = EDeviceRGBType::Keyboard;
+	auto* DeviceInfo = CorsairGetDeviceInfo(DeviceIndex);
+	switch (DeviceInfo->type)
+	{
+	case CDT_Unknown:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_Mouse:
+		Type = EDeviceRGBType::Mouse;
+		break;
+	case CDT_Keyboard:
+		Type = EDeviceRGBType::Keyboard;
+		break;
+	case CDT_Headset:
+		Type = EDeviceRGBType::Headset;
+		break;
+	case CDT_MouseMat:
+		Type = EDeviceRGBType::Mousepad;
+		break;
+	case CDT_HeadsetStand:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_CommanderPro:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_LightingNodePro:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_MemoryModule:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_Cooler:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_Motherboard:
+		Type = EDeviceRGBType::Other;
+		break;
+	case CDT_GraphicsCard:
+		Type = EDeviceRGBType::Other;
+		break;
+	}
 }
 
 int32 FCorsairDevice::GetNumLEDs() const
@@ -82,6 +125,20 @@ EDeviceRGBType FCorsairDevice::GetType() const
 	return Type;
 }
 
+TArray<int32> FCorsairDevice::GetIndicesForKeys(const TArray<FKey>& InKeys)
+{
+	TArray<int32> Indices;
+	for (const FKey& Key : InKeys)
+	{
+		const int32 Index = AdditionalInfos.IndexOfByPredicate([&Key](const auto& InAdditionalInfo) { return InAdditionalInfo.Key == Key; });
+		if (Index != INDEX_NONE)
+		{
+			Indices.Add(Index);
+		}
+	}
+	return Indices;
+}
+
 FVector2D FCorsairDevice::GetDeviceSize(const CorsairLedPositions* InPositions)
 {
 	const auto minmaxWidth = std::minmax_element(
@@ -107,4 +164,3 @@ FVector2D FCorsairDevice::GetDeviceSize(const CorsairLedPositions* InPositions)
 		static_cast<float>(minmaxHeight.second->top + minmaxHeight.second->height - minmaxHeight.first->top)
 	};
 }
-

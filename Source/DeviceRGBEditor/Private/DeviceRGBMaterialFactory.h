@@ -6,7 +6,7 @@
 #include "DeviceRGBMaterialFactory.generated.h"
 
 /**
- * 
+ * Factory for creating materials with correct settings for DeviceRGB.
  */
 UCLASS()
 class UDeviceRGBMaterialFactory : public UFactory

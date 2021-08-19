@@ -2,6 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "IDeviceRGBController.h"
+#include <IDeviceRGB.h>
 
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -40,6 +41,10 @@ public:
 
 	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
 	virtual void* GetDLLHandle() const override { return SDKHandle; }
+
+	static constexpr EDeviceRGBType ToDeviceRGBType(ERazerDeviceType InRazerDeviceType);
+
+	virtual void SetEnabled(bool bEnabled) override;
 
 private:
 	FRazerController();

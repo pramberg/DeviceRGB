@@ -70,3 +70,8 @@ void FCorsairController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunctio
 		InFunction(Device.Get());
 	}
 }
+
+void FCorsairController::SetEnabled(bool bEnabled)
+{
+	CorsairSetLayerPriority(bEnabled ? 255 : 0);
+}

@@ -13,6 +13,7 @@ public:
 	virtual int32 GetNumberOfDevices() const = 0;
 	virtual void FlushBuffers() = 0;
 	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) = 0;
+	virtual void SetEnabled(bool bEnabled) = 0;
 
 	virtual void* GetDLLHandle() const = 0;
 };

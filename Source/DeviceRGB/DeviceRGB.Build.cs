@@ -28,6 +28,7 @@ public class DeviceRGB : ModuleRules
 				"RHI",
 				"InputCore",
 				"EngineSettings",
+				"DeveloperSettings",
 			}
 		);
 

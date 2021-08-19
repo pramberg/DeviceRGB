@@ -108,6 +108,43 @@ void FRazerController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
 	}
 }
 
+constexpr EDeviceRGBType FRazerController::ToDeviceRGBType(ERazerDeviceType InRazerDeviceType)
+{
+	switch (InRazerDeviceType)
+	{
+	case ERazerDeviceType::None:
+		return EDeviceRGBType::Other;
+	case ERazerDeviceType::Keyboard:
+		return EDeviceRGBType::Keyboard;
+	case ERazerDeviceType::Headset:
+		return EDeviceRGBType::Headset;
+	case ERazerDeviceType::Mousepad:
+		return EDeviceRGBType::Mousepad;
+	case ERazerDeviceType::Mouse:
+		return EDeviceRGBType::Mouse;
+	case ERazerDeviceType::Keypad:
+		return EDeviceRGBType::Keypad;
+	case ERazerDeviceType::ChromaLink:
+		return EDeviceRGBType::Other;
+	}
+	return EDeviceRGBType::Other;
+}
+
+void FRazerController::SetEnabled(bool bEnabled)
+{
+	if (bEnabled)
+	{
+		return;
+	}
+
+	// I'm not sure if this is the correct thing to do, but since Razer can't set priority, I guess this is the way to go?
+	ForEachDevice([](IDeviceRGB* InDevice)
+	{
+		auto* RazerDevice = static_cast<FRazerDeviceBase*>(InDevice);
+		RazerDevice->SetStaticColor(FColor::Black);
+	});
+}
+
 bool FRazerController::IsDeviceConnected(RZDEVICEID InDeviceID) const
 {
 #if DEVICERGB_ENABLE_DEVICE_CHECKS
@@ -134,7 +171,7 @@ bool FRazerController::HasAnyKeyboard() const
 		IsDeviceConnected(ChromaSDK::BLADE_PRO) ||
 		IsDeviceConnected(ChromaSDK::HUNTSMAN) ||
 		IsDeviceConnected(ChromaSDK::BLACKWIDOW_ELITE)
-		);
+	);
 }
 
 bool FRazerController::HasAnyMouse() const
@@ -149,7 +186,7 @@ bool FRazerController::HasAnyMouse() const
 		IsDeviceConnected(ChromaSDK::OROCHI_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::NAGA_HEX_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::DEATHADDER_ELITE_CHROMA)
-		);
+	);
 }
 
 bool FRazerController::HasAnyHeadset() const
@@ -159,14 +196,14 @@ bool FRazerController::HasAnyHeadset() const
 		IsDeviceConnected(ChromaSDK::MANOWAR_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::KRAKEN71_REFRESH_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::KRAKEN_KITTY)
-		);
+	);
 }
 
 bool FRazerController::HasAnyMousepad() const
 {
 	return CreateMousepadEffect && (
 		IsDeviceConnected(ChromaSDK::FIREFLY_CHROMA)
-		);
+	);
 }
 
 bool FRazerController::HasAnyKeypad() const
@@ -174,7 +211,7 @@ bool FRazerController::HasAnyKeypad() const
 	return CreateKeypadEffect && (
 		IsDeviceConnected(ChromaSDK::TARTARUS_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::ORBWEAVER_CHROMA)
-		);
+	);
 }
 
 bool FRazerController::HasAnyChromaLink() const
@@ -182,7 +219,7 @@ bool FRazerController::HasAnyChromaLink() const
 	return CreateChromaLinkEffect && (
 		IsDeviceConnected(ChromaSDK::NOMMO_CHROMA) ||
 		IsDeviceConnected(ChromaSDK::NOMMO_CHROMA_PRO)
-		);
+	);
 }
 
 void FRazerController::TryAddDevices()

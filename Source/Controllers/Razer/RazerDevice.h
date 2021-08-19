@@ -4,6 +4,7 @@
 #include "RazerController.h"
 #include "IDeviceRGB.h"
 #include <array>
+#include "RazerKeyConverter.h"
 
 template<ERazerDeviceType DeviceType> int32 GetDeviceWidth() { return 0; }
 template<> int32 GetDeviceWidth<ERazerDeviceType::Keyboard>() { return ChromaSDK::Keyboard::v2::MAX_COLUMN; }
@@ -69,9 +70,16 @@ template<> FVector2D GetUV<ERazerDeviceType::Mousepad>(const FIntPoint& InPositi
 	return Positions[InPosition.X];
 }
 
+class FRazerDeviceBase : public IDeviceRGB
+{
+private:
+	virtual void SetStaticColor(const FColor& InColor) = 0;
+	friend FRazerController;
+};
+
 // This is a template so we can get the correct function ptr at compile time
 template<ERazerDeviceType DeviceType>
-class FRazerDevice : public IDeviceRGB
+class FRazerDevice : public FRazerDeviceBase
 {
 public:
 	FRazerDevice(FRazerController* InSDK) : SDK(InSDK)
@@ -87,9 +95,12 @@ public:
 			{
 				LEDInfos.Add({ GetUV<DeviceType>(Position, DeviceSize) });
 				SetEffectColor(Position, FColor::Red);
+				AdditionalInfos.Add({ FRazerKeyConverter::ToFKey<DeviceType>(Position) });
 			}
 			Position.X = 0;
 		}
+
+		Type = FRazerController::ToDeviceRGBType(DeviceType);
 	}
 
 	virtual int32 GetNumLEDs() const override
@@ -111,6 +122,12 @@ public:
 			Position.X = 0;
 		}
 
+		RecreateEffects();
+		return true;
+	}
+
+	void RecreateEffects()
+	{
 		if constexpr (DeviceType == ERazerDeviceType::Keyboard)
 		{
 			SDK->CreateKeyboardEffect(ChromaSDK::Keyboard::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
@@ -135,12 +152,25 @@ public:
 		{
 			SDK->CreateChromaLinkEffect(ChromaSDK::ChromaLink::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
 		}
-		return true;
 	}
 
 	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
 	virtual FVector2D GetPhysicalSize() const override { return DeviceSize; }
-	virtual EDeviceRGBType GetType() const override { return EDeviceRGBType::Keyboard; }
+	virtual EDeviceRGBType GetType() const override { return Type; }
+
+	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) override
+	{ 
+		TArray<int32> Indices;
+		for (const FKey& Key : InKeys)
+		{
+			const int32 Index = AdditionalInfos.IndexOfByPredicate([&Key](const auto& InAdditionalInfo) { return InAdditionalInfo.Key == Key; });
+			if (Index != INDEX_NONE)
+			{
+				Indices.Add(Index);
+			}
+		}
+		return Indices;
+	}
 
 private:
 	void SetEffectColor(const FIntPoint& InPos, const FColor& InColor)
@@ -153,6 +183,20 @@ private:
 		{
 			EffectContainer.Effect.Color[InPos.Y][InPos.X] = FColorToRazerColor(InColor);
 		}
+	}
+
+	virtual void SetStaticColor(const FColor& InColor) override
+	{
+		FIntPoint Position{ EForceInit::ForceInitToZero };
+		for (; Position.Y < GetDeviceHeight<DeviceType>(); Position.Y++)
+		{
+			for (; Position.X < GetDeviceWidth<DeviceType>(); Position.X++)
+			{
+				SetEffectColor(Position, InColor);
+			}
+			Position.X = 0;
+		}
+		RecreateEffects();
 	}
 
 	constexpr RZCOLOR FColorToRazerColor(const FColor& InColor)
@@ -171,6 +215,7 @@ private:
 
 	TArray<FDeviceLEDInfo> LEDInfos;
 	FCustomEffectContainer<DeviceType> EffectContainer;
+	TArray<FDeviceRGBAdditionalLEDInfo> AdditionalInfos;
 	FVector2D DeviceSize;
 	EDeviceRGBType Type;
 	int32 DeviceIndex;

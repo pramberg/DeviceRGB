@@ -34,6 +34,8 @@ public:
 	/** Performs the readback from the GPU after the graph builder has executed. */
 	virtual void EndFrame() override;
 
+	class FDeviceRGBMaterialParameters* CreateParameters(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs);
+
 private:
 	UDeviceRGBSubsystem* DeviceRGBSubsystem;
 
@@ -43,6 +45,11 @@ private:
 	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> UVData;
 
+	/** Persistent buffer for the UVs */
+	TRefCountPtr<class FRDGPooledBuffer> IndexData;
+
 	/** Persistent buffer for the colors */
 	TRefCountPtr<class FRDGPooledBuffer> ColorData;
+
+	mutable class FViewport* CurrentActiveViewport = nullptr;
 };

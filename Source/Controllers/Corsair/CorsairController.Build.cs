@@ -22,6 +22,7 @@ public class CorsairController : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"DeviceRGB",
+				"InputCore",
 			}
 		);
 

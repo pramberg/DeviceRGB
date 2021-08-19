@@ -23,6 +23,7 @@ public class RazerController : ModuleRules
 				"Engine",
 				"EngineSettings",
 				"DeviceRGB",
+				"InputCore",
 			}
 		);
 

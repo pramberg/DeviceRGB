@@ -20,6 +20,9 @@ public:
 
 	virtual void* GetDLLHandle() const override { return SDKHandle; }
 
+
+	virtual void SetEnabled(bool bEnabled) override;
+
 private:
 	FCorsairController();
 
