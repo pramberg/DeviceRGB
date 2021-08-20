@@ -14,6 +14,8 @@ UDeviceRGBSettings::UDeviceRGBSettings()
 	SectionName = TEXT("DeviceRGB");
 }
 
+#if WITH_EDITOR
+
 FText UDeviceRGBSettings::GetSectionText() const
 {
 	return LOCTEXT("SectionText", "DeviceRGB");
@@ -23,5 +25,7 @@ FText UDeviceRGBSettings::GetSectionDescription() const
 {
 	return LOCTEXT("SectionDescription", "Project settings for DeviceRGB");
 }
+
+#endif // WITH_EDITOR
 
 #undef LOCTEXT_NAMESPACE

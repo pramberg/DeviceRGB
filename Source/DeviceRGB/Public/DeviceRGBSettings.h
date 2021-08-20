@@ -19,8 +19,12 @@ class DEVICERGB_API UDeviceRGBSettings : public UDeveloperSettings
 public:
 	UDeviceRGBSettings();
 
+#if WITH_EDITOR
+
 	virtual FText GetSectionText() const override;
 	virtual FText GetSectionDescription() const override;
+
+#endif // WITH_EDITOR
 
 	/* Material to use when only specifying a texture. */
 	UPROPERTY(config, EditAnywhere, Category = DeviceRGB)
