@@ -10,11 +10,6 @@ public:
 	{
 		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController(FRazerController::Construct());
 	}
-
-	virtual void ShutdownModule() override
-	{
-
-	}
 };
 
 IMPLEMENT_MODULE(FRazerControllerModule, RazerController)

@@ -10,11 +10,6 @@ public:
 	{
 		FModuleManager::GetModuleChecked<FDeviceRGBModule>("DeviceRGB").RegisterController(FCorsairController::Construct());
 	}
-
-	virtual void ShutdownModule() override
-	{
-		
-	}
 };
 
 IMPLEMENT_MODULE(FCorsairControllerModule, CorsairController)
