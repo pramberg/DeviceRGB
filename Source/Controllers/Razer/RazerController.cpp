@@ -4,6 +4,7 @@
 #include "IDeviceRGB.h"
 
 #include <GeneralProjectSettings.h>
+#include "DeviceRGBSettings.h"
 
 FRazerController::FRazerController()
 {
@@ -54,6 +55,7 @@ TUniquePtr<FRazerController> FRazerController::Construct()
 	if (Controller->InitSDK)
 	{
 		const auto* ProjectSettings = GetDefault<UGeneralProjectSettings>();
+		const auto* DeviceRGBSettings = GetDefault<UDeviceRGBSettings>();
 
 		const auto StringOrDefault = [](const FString& InDesired, const TCHAR* InDefault)
 		{
@@ -63,7 +65,7 @@ TUniquePtr<FRazerController> FRazerController::Construct()
 		#define DEVICERGB_SET_APPINFO_PROPERTY(InPropertyName, InValue) _tcscpy_s(InPropertyName, UE_ARRAY_COUNT(InPropertyName), InValue);
 
 		ChromaSDK::APPINFOTYPE AppInfo{};
-		DEVICERGB_SET_APPINFO_PROPERTY(AppInfo.Title, StringOrDefault(ProjectSettings->ProjectName, *FApp::GetName()));
+		DEVICERGB_SET_APPINFO_PROPERTY(AppInfo.Title, *DeviceRGBSettings->GetProjectName());
 		DEVICERGB_SET_APPINFO_PROPERTY(AppInfo.Description, StringOrDefault(ProjectSettings->Description, TEXT("Default Description - Please fill in 'Description' in Project Settings")));
 		DEVICERGB_SET_APPINFO_PROPERTY(AppInfo.Author.Name, StringOrDefault(ProjectSettings->CompanyName, TEXT("Default Author - Please fill in 'CompanyName' in Project Settings")));
 		DEVICERGB_SET_APPINFO_PROPERTY(AppInfo.Author.Contact, StringOrDefault(ProjectSettings->Homepage, TEXT("Contact - Please fill in 'Homepage' in Project Settings")));
