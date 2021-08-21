@@ -125,7 +125,7 @@ void UDeviceRGBSubsystem::Deinitialize()
 
 bool UDeviceRGBSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
-	return PLATFORM_WINDOWS;
+	return PLATFORM_WINDOWS && !IsRunningCommandlet();
 }
 
 void UDeviceRGBSubsystem::SetColors(TFunctionRef<void(IDeviceRGB*, TArray<FColor>&)> InFunction)

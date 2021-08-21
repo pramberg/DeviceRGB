@@ -23,7 +23,7 @@
 		},
 		{
 			"Name": "DeviceRGBEditor",
-			"Type": "Editor",
+			"Type": "EditorNoCommandlet",
 			"LoadingPhase": "Default",
 			"WhitelistPlatforms": [ "Win64" ]
 		}
