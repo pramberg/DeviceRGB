@@ -4,7 +4,7 @@
 	"VersionName": "1.0",
 	"FriendlyName": "DeviceRGB",
 	"Description": "Control RGB devices using materials, layers and masks.",
-	"Category": "Input Devices",
+	"Category": "Devices",
 	"CreatedBy": "Viktor Pramberg",
 	"CreatedByURL": "https://viktorpramberg.com",
 	"DocsURL": "https://github.com/pramberg/DeviceRGB/wiki",
