@@ -2,6 +2,7 @@
 #include "CorsairController.h"
 #include <Interfaces/IPluginManager.h>
 #include "CorsairDevice.h"
+#include "DeviceRGB.h"
 
 #include <CUESDK.h>
 
@@ -30,7 +31,7 @@ TUniquePtr<FCorsairController> FCorsairController::Construct()
 	CorsairPerformProtocolHandshake();
 	if (CorsairGetLastError())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to connect to Corsair CUE service."));
+		UE_LOG(LogDeviceRGB, Display, TEXT("Failed to connect to Corsair CUE service."));
 		return nullptr;
 	}
 
@@ -58,7 +59,7 @@ void FCorsairController::FlushBuffersImpl()
 	{
 		if (Error != CE_Success)
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to flush color buffer"));
+			UE_LOG(LogDeviceRGB, Error, TEXT("Failed to flush Corsair color buffer"));
 		}
 	}, nullptr);
 }

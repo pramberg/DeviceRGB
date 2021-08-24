@@ -1,7 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
+// Copyright(c) 2021 Viktor Pramberg
 #include "DeviceRGBSettings.h"
+#include "DeviceRGB.h"
 #include <Materials/MaterialInterface.h>
 #include <GeneralProjectSettings.h>
 
@@ -26,8 +25,9 @@ FString UDeviceRGBSettings::GetProjectName() const
 	}
 	else
 	{
-		if (!ensureMsgf(!Name.IsEmpty(), TEXT("ProjectNameOverride can't be empty. Using default value.")))
+		if (Name.IsEmpty())
 		{
+			ensureMsgf(false, TEXT("ProjectNameOverride can't be empty. Using default value."));
 			Name = DefaultProjectNameOverride;
 		}
 	}
@@ -64,8 +64,9 @@ void UDeviceRGBSettings::PostEditChangeProperty(struct FPropertyChangedEvent& Pr
 			return;
 		}
 
-		if (!ensureAlwaysMsgf(!ProjectNameOverride.IsEmpty(), TEXT("ProjectNameOverride can't be empty. Resetting it to default value.")))
+		if (ProjectNameOverride.IsEmpty())
 		{
+			UE_LOG(LogDeviceRGB, Error, TEXT("ProjectNameOverride can't be empty. Resetting it to default value."));
 			ProjectNameOverride = DefaultProjectNameOverride;
 		}
 	}

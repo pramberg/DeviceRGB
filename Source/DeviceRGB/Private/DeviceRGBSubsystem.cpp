@@ -3,6 +3,7 @@
 #include "DeviceRGBViewExtension.h"
 #include "DeviceRGBSettings.h"
 #include "IDeviceRGB.h"
+#include "DeviceRGB.h"
 
 #include <Engine/Texture2D.h>
 #include <Materials/MaterialInterface.h>
@@ -137,7 +138,7 @@ void UDeviceRGBSubsystem::SetColors(TFunctionRef<void(IDeviceRGB*, TArray<FColor
 		{
 			Colors.Empty(InDevice->GetNumLEDs());
 			InFunction(InDevice, Colors);
-			ensure(InDevice->GetNumLEDs() == Colors.Num());
+			check(InDevice->GetNumLEDs() == Colors.Num());
 			InDevice->SetColors(Colors, false);
 		});
 		SDK->FlushBuffers();
@@ -203,7 +204,7 @@ TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const
 	}
 	else
 	{
-		ensureAlwaysMsgf(false, TEXT("UDeviceRGBSubsystem::InitializeGraphicsCache() called with invalid graphic: [%s]. DeviceRGB only supports Materials and Texture2D!"), *InInfo.Graphic->GetName());
+		UE_LOG(LogDeviceRGB, Error, TEXT("UDeviceRGBSubsystem::InitializeGraphicsCache() called with invalid graphic: [%s]. DeviceRGB only supports Materials and Texture2D!"), *InInfo.Graphic->GetName());
 		return TOptional<FDeviceRGBGraphicCache>();
 	}
 	Cache.BlendMode = InInfo.BlendMode;
