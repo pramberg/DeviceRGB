@@ -9,7 +9,7 @@
 	"CreatedByURL": "https://viktorpramberg.com",
 	"DocsURL": "https://github.com/pramberg/DeviceRGB/wiki",
 	"MarketplaceURL": "",
-	"SupportURL": "",
+	"SupportURL": "https://github.com/pramberg/DeviceRGB/issues",
 	"CanContainContent": true,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
