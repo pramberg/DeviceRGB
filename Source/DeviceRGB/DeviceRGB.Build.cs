@@ -53,6 +53,7 @@ public class DeviceRGB : ModuleRules
 		{
 			TryAddController("CUESDK", "CorsairController");
 			TryAddController("ChromaSDK", "RazerController");
+			TryAddController("LED", "LogitechController");
 
 			GenerateControllersToLoadDefinition();
 		}
