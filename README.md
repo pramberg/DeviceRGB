@@ -9,3 +9,4 @@ Take a look at the [wiki!](https://github.com/pramberg/DeviceRGB/wiki)
 ## ⌨️ Supports devices from these manufacturers
 * Corsair
 * Razer
+* Logitech
