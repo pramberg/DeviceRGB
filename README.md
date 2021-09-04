@@ -10,3 +10,4 @@ Take a look at the [wiki!](https://github.com/pramberg/DeviceRGB/wiki)
 * Corsair
 * Razer
 * Logitech
+* Wooting
