@@ -9,7 +9,18 @@ FWootingDevice::FWootingDevice()
 {
 	constexpr int32 DeviceWidth = WOOTING_RGB_COLS;
 	constexpr int32 DeviceHeight = WOOTING_RGB_ROWS;
-	DeviceSize = FVector2D{ static_cast<float>(DeviceWidth), static_cast<float>(DeviceHeight) };
+
+	{
+		const auto* Info = wooting_rgb_device_info();
+		if (Info && Info->connected)
+		{
+			DeviceSize = FVector2D{ static_cast<float>(Info->max_columns), static_cast<float>(Info->max_rows) };
+		}
+		else
+		{
+			DeviceSize = FVector2D{ static_cast<float>(DeviceWidth), static_cast<float>(DeviceHeight) };
+		}
+	}
 
 	const int32 NumLEDs = DeviceWidth * DeviceHeight;
 	ReserveLeds(NumLEDs);
