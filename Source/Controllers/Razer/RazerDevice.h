@@ -70,7 +70,7 @@ template<> FVector2D GetUV<ERazerDeviceType::Mousepad>(const FIntPoint& InPositi
 	return Positions[InPosition.X];
 }
 
-class FRazerDeviceBase : public IDeviceRGB
+class FRazerDeviceBase : public FDeviceRGB
 {
 private:
 	virtual void SetStaticColor(const FColor& InColor) = 0;
@@ -82,30 +82,27 @@ template<ERazerDeviceType DeviceType>
 class FRazerDevice : public FRazerDeviceBase
 {
 public:
-	FRazerDevice(FRazerController* InSDK) : SDK(InSDK)
+	FRazerDevice(FRazerController* InController) : Controller(InController)
 	{
 		const int32 DeviceWidth = GetDeviceWidth<DeviceType>();
 		const int32 DeviceHeight = GetDeviceHeight<DeviceType>();
 		DeviceSize = FVector2D{ static_cast<float>(DeviceWidth), static_cast<float>(DeviceHeight) };
+
+		const int32 NumLEDs = DeviceWidth * DeviceHeight;
+		ReserveLeds(NumLEDs);
 
 		FIntPoint Position{ EForceInit::ForceInitToZero };
 		for (; Position.Y < DeviceHeight; Position.Y++)
 		{
 			for (; Position.X < DeviceWidth; Position.X++)
 			{
-				LEDInfos.Add({ GetUV<DeviceType>(Position, DeviceSize) });
 				SetEffectColor(Position, FColor::Red);
-				AdditionalInfos.Add({ FRazerKeyConverter::ToFKey<DeviceType>(Position) });
+				AddLed({ GetUV<DeviceType>(Position, DeviceSize) }, { FRazerKeyConverter::ToFKey<DeviceType>(Position) });
 			}
 			Position.X = 0;
 		}
 
 		Type = FRazerController::ToDeviceRGBType(DeviceType);
-	}
-
-	virtual int32 GetNumLEDs() const override
-	{
-		return GetDeviceWidth<DeviceType>() * GetDeviceHeight<DeviceType>();
 	}
 
 	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true) override
@@ -130,47 +127,32 @@ public:
 	{
 		if constexpr (DeviceType == ERazerDeviceType::Keyboard)
 		{
-			SDK->CreateKeyboardEffect(ChromaSDK::Keyboard::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
+			Controller->CreateKeyboardEffect(ChromaSDK::Keyboard::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
 		}
 		else if constexpr (DeviceType == ERazerDeviceType::Headset)
 		{
-			SDK->CreateHeadsetEffect(ChromaSDK::Headset::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
+			Controller->CreateHeadsetEffect(ChromaSDK::Headset::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
 		}
 		else if constexpr (DeviceType == ERazerDeviceType::Mousepad)
 		{
-			SDK->CreateMousepadEffect(ChromaSDK::Mousepad::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
+			Controller->CreateMousepadEffect(ChromaSDK::Mousepad::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
 		}
 		else if constexpr (DeviceType == ERazerDeviceType::Mouse)
 		{
-			SDK->CreateMouseEffect(ChromaSDK::Mouse::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
+			Controller->CreateMouseEffect(ChromaSDK::Mouse::CHROMA_CUSTOM2, &EffectContainer.Effect, nullptr);
 		}
 		else if constexpr (DeviceType == ERazerDeviceType::Keypad)
 		{
-			SDK->CreateKeypadEffect(ChromaSDK::Keypad::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
+			Controller->CreateKeypadEffect(ChromaSDK::Keypad::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
 		}
 		else if constexpr (DeviceType == ERazerDeviceType::ChromaLink)
 		{
-			SDK->CreateChromaLinkEffect(ChromaSDK::ChromaLink::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
+			Controller->CreateChromaLinkEffect(ChromaSDK::ChromaLink::CHROMA_CUSTOM, &EffectContainer.Effect, nullptr);
 		}
 	}
 
-	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
 	virtual FVector2D GetPhysicalSize() const override { return DeviceSize; }
 	virtual EDeviceRGBType GetType() const override { return Type; }
-
-	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) override
-	{ 
-		TArray<int32> Indices;
-		for (const FKey& Key : InKeys)
-		{
-			const int32 Index = AdditionalInfos.IndexOfByPredicate([&Key](const auto& InAdditionalInfo) { return InAdditionalInfo.Key == Key; });
-			if (Index != INDEX_NONE)
-			{
-				Indices.Add(Index);
-			}
-		}
-		return Indices;
-	}
 
 private:
 	void SetEffectColor(const FIntPoint& InPos, const FColor& InColor)
@@ -213,13 +195,11 @@ private:
 		return FColor(Red, Green, Blue, Alpha);
 	}
 
-	TArray<FDeviceLEDInfo> LEDInfos;
 	FCustomEffectContainer<DeviceType> EffectContainer;
-	TArray<FDeviceRGBAdditionalLEDInfo> AdditionalInfos;
+
 	FVector2D DeviceSize;
 	EDeviceRGBType Type;
 	int32 DeviceIndex;
-	int32 NumLEDs;
 
-	FRazerController* SDK;
+	FRazerController* Controller;
 };

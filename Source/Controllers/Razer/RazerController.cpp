@@ -97,19 +97,6 @@ TUniquePtr<FRazerController> FRazerController::Construct()
 	return MoveTemp(Controller);
 }
 
-int32 FRazerController::GetNumberOfDevices() const
-{
-	return Devices.Num();
-}
-
-void FRazerController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
-{
-	for (auto& Device : Devices)
-	{
-		InFunction(Device.Get());
-	}
-}
-
 constexpr EDeviceRGBType FRazerController::ToDeviceRGBType(ERazerDeviceType InRazerDeviceType)
 {
 	switch (InRazerDeviceType)
@@ -228,26 +215,26 @@ void FRazerController::TryAddDevices()
 {
 	if (HasAnyKeyboard())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::Keyboard>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::Keyboard>>(this);
 	}
 	if (HasAnyHeadset())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::Headset>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::Headset>>(this);
 	}
 	if (HasAnyMousepad())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::Mousepad>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::Mousepad>>(this);
 	}
 	if (HasAnyMouse())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::Mouse>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::Mouse>>(this);
 	}
 	if (HasAnyKeypad())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::Keypad>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::Keypad>>(this);
 	}
 	if (HasAnyChromaLink())
 	{
-		Devices.Add(MakeUnique<FRazerDevice<ERazerDeviceType::ChromaLink>>(this));
+		AddDevice<FRazerDevice<ERazerDeviceType::ChromaLink>>(this);
 	}
 }

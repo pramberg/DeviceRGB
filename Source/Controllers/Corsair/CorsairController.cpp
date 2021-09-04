@@ -35,17 +35,12 @@ TUniquePtr<FCorsairController> FCorsairController::Construct()
 		return nullptr;
 	}
 
-	for (int32 DeviceIndex = 0; DeviceIndex < Controller->GetNumberOfDevices(); DeviceIndex++)
+	for (int32 DeviceIndex = 0; DeviceIndex < CorsairGetDeviceCount(); DeviceIndex++)
 	{
-		Controller->Devices.Add(MakeUnique<FCorsairDevice>(DeviceIndex));
+		Controller->AddDevice<FCorsairDevice>(DeviceIndex);
 	}
 
 	return MoveTemp(Controller);
-}
-
-int32 FCorsairController::GetNumberOfDevices() const
-{
-	return CorsairGetDeviceCount();
 }
 
 void FCorsairController::FlushBuffers()
@@ -62,14 +57,6 @@ void FCorsairController::FlushBuffersImpl()
 			UE_LOG(LogDeviceRGB, Error, TEXT("Failed to flush Corsair color buffer"));
 		}
 	}, nullptr);
-}
-
-void FCorsairController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
-{
-	for (auto& Device : Devices)
-	{
-		InFunction(Device.Get());
-	}
 }
 
 void FCorsairController::SetEnabled(bool bEnabled)

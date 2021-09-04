@@ -29,17 +29,14 @@ enum class ERazerDeviceType : uint8
 	ChromaLink,
 };
 
-class FRazerController : public IDeviceRGBController
+class FRazerController : public FDeviceRGBController
 {
 public:
 	virtual ~FRazerController() override;
 
 	static TUniquePtr<FRazerController> Construct();
 
-	virtual int32 GetNumberOfDevices() const override;
 	virtual void FlushBuffers() override {}
-
-	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
 	virtual void* GetDLLHandle() const override { return SDKHandle; }
 
 	static constexpr EDeviceRGBType ToDeviceRGBType(ERazerDeviceType InRazerDeviceType);

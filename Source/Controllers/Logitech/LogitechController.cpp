@@ -34,19 +34,6 @@ TUniquePtr<FLogitechController> FLogitechController::Construct()
 	return MoveTemp(Controller);
 }
 
-int32 FLogitechController::GetNumberOfDevices() const
-{
-	return Devices.Num();
-}
-
-void FLogitechController::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
-{
-	for (auto& Device : Devices)
-	{
-		InFunction(Device.Get());
-	}
-}
-
 void FLogitechController::SetEnabled(bool bEnabled)
 {
 	if (bEnabled)

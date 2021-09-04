@@ -54,3 +54,40 @@ public:
 
 	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) = 0;
 };
+
+class FDeviceRGB : public IDeviceRGB
+{
+public:
+	virtual int32 GetNumLEDs() const override { return LEDInfos.Num(); }
+	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
+
+	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) override
+	{
+		TArray<int32> Indices;
+		for (const FKey& Key : InKeys)
+		{
+			const int32 Index = AdditionalInfos.IndexOfByPredicate([&Key](const auto& InAdditionalInfo) { return InAdditionalInfo.Key == Key; });
+			if (Index != INDEX_NONE)
+			{
+				Indices.Add(Index);
+			}
+		}
+		return Indices;
+	}
+
+	void ReserveLeds(int32 InNumLEDs)
+	{
+		LEDInfos.Reserve(InNumLEDs);
+		AdditionalInfos.Reserve(InNumLEDs);
+	}
+
+	void AddLed(const FDeviceLEDInfo& InLedInfo, const FDeviceRGBAdditionalLEDInfo& InAdditionalInfo)
+	{
+		LEDInfos.Add(InLedInfo);
+		AdditionalInfos.Add(InAdditionalInfo);
+	}
+
+protected:
+	TArray<FDeviceLEDInfo> LEDInfos;
+	TArray<FDeviceRGBAdditionalLEDInfo> AdditionalInfos;
+};

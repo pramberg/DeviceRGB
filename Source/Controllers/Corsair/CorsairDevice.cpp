@@ -14,10 +14,9 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 		return;
 	}
 
-	NumLEDs = Positions->numberOfLed;
+	const int32 NumLEDs = Positions->numberOfLed;
 	Colors.Reserve(NumLEDs);
-	LEDInfos.Reserve(NumLEDs);
-	AdditionalInfos.Reserve(NumLEDs);
+	ReserveLeds(NumLEDs);
 	
 	DeviceSize = GetDeviceSize(Positions);
 	const float AspectRatio = FMath::Max(DeviceSize.X, DeviceSize.Y) / FMath::Min(DeviceSize.X, DeviceSize.Y);
@@ -37,9 +36,8 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 			return LedCenter;
 		}();
 
-		LEDInfos.Add(FDeviceLEDInfo{ UV });
 		Colors.Add({ CurrentLED.ledId, 0, 0, 0});
-		AdditionalInfos.Add({ FCorsairKeyConverter::ToFKey(CurrentLED.ledId) });
+		AddLed({ UV }, { FCorsairKeyConverter::ToFKey(CurrentLED.ledId) });
 	}
 
 	auto* DeviceInfo = CorsairGetDeviceInfo(DeviceIndex);
@@ -84,11 +82,6 @@ FCorsairDevice::FCorsairDevice(int32 InDeviceIndex) : DeviceIndex(InDeviceIndex)
 	}
 }
 
-int32 FCorsairDevice::GetNumLEDs() const
-{
-	return NumLEDs;
-}
-
 bool FCorsairDevice::SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers /*= true*/)
 {
 	auto It = InColors.CreateConstIterator();
@@ -110,11 +103,6 @@ bool FCorsairDevice::SetColors(const TArray<FColor>& InColors, bool bInFlushBuff
 	return bSuccessful;
 }
 
-TArray<FDeviceLEDInfo> FCorsairDevice::GetLEDInfos() const
-{
-	return LEDInfos;
-}
-
 FVector2D FCorsairDevice::GetPhysicalSize() const
 {
 	return DeviceSize;
@@ -123,20 +111,6 @@ FVector2D FCorsairDevice::GetPhysicalSize() const
 EDeviceRGBType FCorsairDevice::GetType() const
 {
 	return Type;
-}
-
-TArray<int32> FCorsairDevice::GetIndicesForKeys(const TArray<FKey>& InKeys)
-{
-	TArray<int32> Indices;
-	for (const FKey& Key : InKeys)
-	{
-		const int32 Index = AdditionalInfos.IndexOfByPredicate([&Key](const auto& InAdditionalInfo) { return InAdditionalInfo.Key == Key; });
-		if (Index != INDEX_NONE)
-		{
-			Indices.Add(Index);
-		}
-	}
-	return Indices;
 }
 
 FVector2D FCorsairDevice::GetDeviceSize(const CorsairLedPositions* InPositions)

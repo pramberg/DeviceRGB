@@ -31,22 +31,16 @@ public:
 
 static_assert(sizeof(FLogitechColor) == LOGI_LED_BITMAP_BYTES_PER_KEY, "Size of FLogitechColor must match Logitech's bytes per key");
 
-class FLogitechController : public IDeviceRGBController
+class FLogitechController : public FDeviceRGBController
 {
 public:
 	virtual ~FLogitechController() override;
 
 	static TUniquePtr<FLogitechController> Construct();
 
-	virtual int32 GetNumberOfDevices() const override;
 	virtual void FlushBuffers() override {}
-
-	virtual void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction) override;
-	virtual void* GetDLLHandle() const override { return nullptr; }
 	virtual void SetEnabled(bool bEnabled) override;
 
 private:
 	FLogitechController();
-
-	TArray<TUniquePtr<IDeviceRGB>> Devices;
 };
