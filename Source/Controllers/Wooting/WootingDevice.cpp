@@ -5,6 +5,11 @@
 
 #include <wooting-rgb-sdk.h>
 
+FVector2D Frac(const FVector2D& Value)
+{
+	return { FMath::Frac(Value.X), FMath::Frac(Value.Y) };
+}
+
 FWootingDevice::FWootingDevice()
 {
 	constexpr int32 DeviceWidth = WOOTING_RGB_COLS;
@@ -31,7 +36,7 @@ FWootingDevice::FWootingDevice()
 		for (; Position.X < DeviceWidth; Position.X++)
 		{
 			Colors.Add(FColor::Black);
-			AddLed({ FVector2D(Position) / DeviceSize }, { FWootingKeyConverter::ToFKey(Position) });
+			AddLed({ Frac(FVector2D(Position) / DeviceSize) }, { FWootingKeyConverter::ToFKey(Position) });
 		}
 		Position.X = 0;
 	}
