@@ -12,7 +12,11 @@ public:
 
 	void RegisterController(TUniquePtr<IDeviceRGBController>&& InController)
 	{
-		check(GEngine && GEngine->GetEngineSubsystem<UDeviceRGBSubsystem>());
-		GEngine->GetEngineSubsystem<UDeviceRGBSubsystem>()->RegisterController(MoveTemp(InController));
+		check(GEngine);
+
+		if (UDeviceRGBSubsystem* Subsystem = GEngine->GetEngineSubsystem<UDeviceRGBSubsystem>())
+		{
+			Subsystem->RegisterController(MoveTemp(InController));
+		}
 	}
 };
