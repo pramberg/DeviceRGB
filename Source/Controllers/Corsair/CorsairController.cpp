@@ -23,7 +23,7 @@ FCorsairController::~FCorsairController()
 TUniquePtr<FCorsairController> FCorsairController::Construct()
 {
 	auto Controller = TUniquePtr<FCorsairController>(new FCorsairController());
-	if (!Controller->GetDLLHandle())
+	if (!Controller->SDKHandle)
 	{
 		return nullptr;
 	}

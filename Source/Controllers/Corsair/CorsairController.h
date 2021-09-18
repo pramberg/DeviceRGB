@@ -13,7 +13,6 @@ public:
 
 	virtual void FlushBuffers() override;
 	static void FlushBuffersImpl();
-	virtual void* GetDLLHandle() const override { return SDKHandle; }
 	virtual void SetEnabled(bool bEnabled) override;
 
 private:

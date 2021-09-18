@@ -48,7 +48,7 @@ FRazerController::~FRazerController()
 TUniquePtr<FRazerController> FRazerController::Construct()
 {
 	auto Controller = TUniquePtr<FRazerController>(new FRazerController());
-	if (!Controller->GetDLLHandle())
+	if (!Controller->SDKHandle)
 		return nullptr;
 
 	/* InitSDK is a new and nicer way of initializing, but it may not be supported by older clients */
