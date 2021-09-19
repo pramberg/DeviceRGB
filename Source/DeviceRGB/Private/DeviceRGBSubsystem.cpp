@@ -16,7 +16,7 @@ bool UDeviceRGBSubsystem::AddLayer(const FDeviceRGBLayerInfo& InInfo)
 	{
 		GraphicsCaches.Add(Cache.GetValue());
 		SetEnabled(true);
-		MarkCacheDirty();
+		MarkGraphicsCacheDirty();
 		return true;
 	}
 	return false;
@@ -30,7 +30,7 @@ void UDeviceRGBSubsystem::RemoveLayer()
 	}
 
 	GraphicsCaches.RemoveAt(GraphicsCaches.Num() - 1);
-	MarkCacheDirty();
+	MarkGraphicsCacheDirty();
 
 	if (GraphicsCaches.Num() == 0)
 	{
@@ -41,7 +41,7 @@ void UDeviceRGBSubsystem::RemoveLayer()
 void UDeviceRGBSubsystem::RemoveAllLayers()
 {
 	GraphicsCaches.Empty();
-	MarkCacheDirty();
+	MarkGraphicsCacheDirty();
 	SetEnabled(false);
 }
 
@@ -51,7 +51,7 @@ bool UDeviceRGBSubsystem::InsertLayer(int32 InIndex, const FDeviceRGBLayerInfo& 
 	{
 		GraphicsCaches.Insert(Cache.GetValue(), InIndex);
 		SetEnabled(true);
-		MarkCacheDirty();
+		MarkGraphicsCacheDirty();
 		return true;
 	}
 	return false;
@@ -68,7 +68,7 @@ bool UDeviceRGBSubsystem::ReplaceLayer(int32 InIndex, const FDeviceRGBLayerInfo&
 	{
 		GraphicsCaches[InIndex] = Cache.GetValue();
 		SetEnabled(true);
-		MarkCacheDirty();
+		MarkGraphicsCacheDirty();
 		return true;
 	}
 	return false;
@@ -82,9 +82,9 @@ void UDeviceRGBSubsystem::SetEnabled(bool bEnabled)
 	}
 
 	bIsEnabled = bEnabled;
-	for (auto& SDK : SupportedSDKs)
+	for (auto& Controller : Controllers)
 	{
-		SDK->SetEnabled(bIsEnabled);
+		Controller->SetEnabled(bIsEnabled);
 	}
 }
 
@@ -102,17 +102,7 @@ void UDeviceRGBSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 #endif // DEVICERGB_CONTROLLERS_TO_LOAD
 
-	TInterval<int32> CurrentRange{ 0, 0 };
-	ForEachDevice([&](IDeviceRGB* InDevice)
-	{
-		CurrentRange.Min = CurrentRange.Max;
-		for (const auto& LEDInfo : InDevice->GetLEDInfos())
-		{
-			CachedLEDInfos.Add(LEDInfo);
-			CurrentRange.Max++;
-		}
-		DeviceRanges.Add(CurrentRange);
-	});
+	MarkDeviceInfoCacheDirty();
 
 	ViewExtension = FSceneViewExtensions::NewExtension<FDeviceRGBSceneViewExtension>(this);
 }
@@ -122,6 +112,8 @@ void UDeviceRGBSubsystem::Deinitialize()
 	Super::Deinitialize();
 
 	ViewExtension.Reset();
+
+	bIsEnabled = false;
 }
 
 bool UDeviceRGBSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -132,51 +124,99 @@ bool UDeviceRGBSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 void UDeviceRGBSubsystem::SetColors(TFunctionRef<void(IDeviceRGB*, TArray<FColor>&)> InFunction)
 {
 	TArray<FColor> Colors;
-	for (auto& SDK : SupportedSDKs)
+	for (auto& Controller : Controllers)
 	{
-		SDK->ForEachDevice([&](IDeviceRGB* InDevice)
+		Controller->ForEachDevice([&](IDeviceRGB* InDevice)
 		{
 			Colors.Empty(InDevice->GetNumLEDs());
 			InFunction(InDevice, Colors);
 			check(InDevice->GetNumLEDs() == Colors.Num());
 			InDevice->SetColors(Colors, false);
 		});
-		SDK->FlushBuffers();
+		Controller->FlushBuffers();
 	}
 }
 
-void UDeviceRGBSubsystem::MarkCacheDirty()
+void UDeviceRGBSubsystem::MarkGraphicsCacheDirty()
 {
-	bForceRefresh = true;
+	bGraphicsCacheDirty = true;
+}
+
+FVector2D Frac(const FVector2D& Value)
+{
+	return { FMath::Frac(Value.X), FMath::Frac(Value.Y) };
+}
+
+void UDeviceRGBSubsystem::MarkDeviceInfoCacheDirty()
+{
+	bDeviceInfoCacheDirty = true;
+
+	CachedLEDInfos.Empty();
+	DeviceRanges.Empty();
+
+	const UDeviceRGBSettings* Settings = GetDefault<UDeviceRGBSettings>();
+
+	TInterval<int32> CurrentRange{ 0, 0 };
+	ForEachDevice([&](IDeviceRGB* InDevice)
+	{
+		const FTransform2D Transform = Settings->GetTransformForDevice(InDevice).ToSlateRenderTransform();
+
+		CurrentRange.Min = CurrentRange.Max;
+		for (const auto& LEDInfo : InDevice->GetLEDInfos())
+		{
+			CachedLEDInfos.Add({ Frac(Transform.TransformPoint(LEDInfo.UV)) });
+			CurrentRange.Max++;
+		}
+		DeviceRanges.Add(CurrentRange);
+	});
+}
+
+void UDeviceRGBSubsystem::ResetDirtyFlags()
+{
+	bGraphicsCacheDirty = false;
+	bDeviceInfoCacheDirty = false;
 }
 
 void UDeviceRGBSubsystem::RegisterController(TUniquePtr<IDeviceRGBController>&& InController)
 {
 	if (InController)
 	{
-		SupportedSDKs.Add(MoveTemp(InController));
-		MarkCacheDirty();
+		Controllers.Add(MoveTemp(InController));
+		MarkDeviceInfoCacheDirty();
 	}
 }
 
 void UDeviceRGBSubsystem::ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction)
 {
-	for (auto& SDK : SupportedSDKs)
+	for (auto& Controller : Controllers)
 	{
-		SDK->ForEachDevice(InFunction);
+		Controller->ForEachDevice(InFunction);
 	}
 }
 
 void UDeviceRGBSubsystem::ForEachDevice(TFunctionRef<void(IDeviceRGB*, int32)> InFunction)
 {
 	int32 i = 0;
-	for (auto& SDK : SupportedSDKs)
+	for (auto& Controller : Controllers)
 	{
-		SDK->ForEachDevice([&](IDeviceRGB* InDevice)
+		Controller->ForEachDevice([&](IDeviceRGB* InDevice)
 		{
 			InFunction(InDevice, i++);
 		});
 	}
+}
+
+bool IsValidTextureMaterial(UMaterialInterface* InMaterial)
+{
+	if (!InMaterial)
+	{
+		return false;
+	}
+
+	static const FName TextureParameterName("Texture");
+	UTexture* Texture;
+
+	return InMaterial->GetTextureParameterValue({ TextureParameterName }, Texture);
 }
 
 TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const FDeviceRGBLayerInfo& InInfo)
@@ -194,6 +234,8 @@ TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const
 	else if (UTexture2D* Texture = Cast<UTexture2D>(InInfo.Graphic))
 	{
 		UMaterialInterface* BaseMaterial = GetDefault<UDeviceRGBSettings>()->TextureMaterial.LoadSynchronous();
+		
+		check(IsValidTextureMaterial(BaseMaterial));
 
 		const FName Name(FString::Printf(TEXT("%s(%s)"), *BaseMaterial->GetName(), *Texture->GetName()));
 		UMaterialInstanceDynamic* CreatedMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr, Name);
@@ -204,7 +246,7 @@ TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const
 	}
 	else
 	{
-		UE_LOG(LogDeviceRGB, Error, TEXT("UDeviceRGBSubsystem::InitializeGraphicsCache() called with invalid graphic: [%s]. DeviceRGB only supports Materials and Texture2D!"), *InInfo.Graphic->GetName());
+		UE_LOG(LogDeviceRGB, Error, TEXT("UDeviceRGBSubsystem::CreateGraphicsCache() called with invalid graphic: [%s]. DeviceRGB only supports Materials and Texture2D!"), *InInfo.Graphic->GetName());
 		return TOptional<FDeviceRGBGraphicCache>();
 	}
 	Cache.BlendMode = InInfo.BlendMode;
@@ -216,6 +258,7 @@ TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const
 			if (Type & (1 << static_cast<uint8>(InDevice->GetType())))
 			{
 				const TInterval<int32>& Interval = DeviceRanges[InCurrentIndex];
+				Cache.Indices.Reserve(Cache.Indices.Num() + Interval.Size());
 				for (int32 i = Interval.Min; i < Interval.Max; i++)
 				{
 					Cache.Indices.Add(i);
@@ -232,7 +275,7 @@ TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const
 			if (Indices.Num())
 			{
 				const int32 DeviceStartIndex = DeviceRanges[InCurrentIndex].Min;
-				Cache.Indices.Reserve(Indices.Num());
+				Cache.Indices.Reserve(Cache.Indices.Num() + Indices.Num());
 				Algo::Transform(Indices, Cache.Indices, [DeviceStartIndex](int32 DeviceIndex) { return DeviceStartIndex + DeviceIndex; });
 			}
 		});

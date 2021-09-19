@@ -135,6 +135,14 @@ bool FDeviceRGBSceneViewExtension::IsActiveThisFrameInContext(FSceneViewExtensio
 		}
 	}
 
+	if (!DeviceRGBSubsystem->ShouldDoCompleteRebuild())
+	{
+		if (!UVData.IsValid() || !ColorData.IsValid())
+		{
+			return false;
+		}
+	}
+
 #if WITH_EDITOR
 	if (Context.Viewport && (Context.Viewport->HasFocus() || CurrentActiveViewport == nullptr || CurrentActiveViewport->GetClient() == nullptr))
 	{
@@ -182,23 +190,11 @@ FDeviceRGBMaterialParameters* FDeviceRGBSceneViewExtension::CreateParameters(FRD
 	Parameters->SceneTextures = CreateSceneTextureShaderParameters(GraphBuilder, View.GetFeatureLevel(), ESceneTextureSetupMode::All);;
 	Parameters->View = View.ViewUniformBuffer;
 
-	FRDGBufferRef ColorsBuffer;
-	if (!UVData.IsValid() || DeviceRGBSubsystem->bForceRefresh)
+	if (DeviceRGBSubsystem->ShouldRebuild())
 	{
 		RDG_EVENT_SCOPE(GraphBuilder, "Setup");
 
-		// UVs
-		TArray<FVector2D> UVs;
-		for (const auto& LedInfo : DeviceRGBSubsystem->GetCachedInfos())
-		{
-			UVs.Add(LedInfo.UV);
-		}
-
-		auto LedUVsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_LedUVs"), UVs.GetTypeSize(), UVs.Num(), UVs.GetData(), UVs.GetTypeSize() * UVs.Num());
-		Parameters->LedUVs = GraphBuilder.CreateSRV(LedUVsBuffer);
-		GraphBuilder.QueueBufferExtraction(LedUVsBuffer, &UVData, ERHIAccess::SRVCompute);
-
-		// Index buffer
+		// Index buffer - Will always need to be rebuilt
 		TArray<uint32> Indices;
 		for (auto& Graphic : DeviceRGBSubsystem->GetGraphicsCaches())
 		{
@@ -208,37 +204,65 @@ FDeviceRGBMaterialParameters* FDeviceRGBSceneViewExtension::CreateParameters(FRD
 		if (Indices.Num() > 0)
 		{
 			auto IndexBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_IndexBuffer"), Indices.GetTypeSize(), Indices.Num(), Indices.GetData(), Indices.GetTypeSize() * Indices.Num());
-			Parameters->IndexBuffer = GraphBuilder.CreateSRV(IndexBuffer);
+			CurrentFrameIndexBufferSRV = GraphBuilder.CreateSRV(IndexBuffer);
 			GraphBuilder.QueueBufferExtraction(IndexBuffer, &IndexData, ERHIAccess::SRVCompute);
 		}
 
-		// Color
-		TArray<FLinearColor> Colors;
-		Colors.Init(FLinearColor::Black, UVs.Num());
-		ColorsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_Colors"), Colors.GetTypeSize(), Colors.Num(), Colors.GetData(), Colors.GetTypeSize() * Colors.Num());
-		Parameters->Colors = GraphBuilder.CreateUAV(ColorsBuffer);
+		// If this is true, it is guaranteed to be the first layer, so we just set the CurrentFrameX variables
+		if (DeviceRGBSubsystem->ShouldDoCompleteRebuild())
+		{
+			// UVs
+			TArray<FVector2D> UVs;
+			for (const auto& LedInfo : DeviceRGBSubsystem->GetCachedInfos())
+			{
+				UVs.Add(LedInfo.UV);
+			}
 
-		GraphBuilder.QueueBufferExtraction(ColorsBuffer, &ColorData, ERHIAccess::UAVCompute);
+			auto LedUVsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_LedUVs"), UVs.GetTypeSize(), UVs.Num(), UVs.GetData(), UVs.GetTypeSize() * UVs.Num());
+			CurrentFrameUVsSRV = GraphBuilder.CreateSRV(LedUVsBuffer);
+			GraphBuilder.QueueBufferExtraction(LedUVsBuffer, &UVData, ERHIAccess::SRVCompute);
 
-		DeviceRGBSubsystem->bForceRefresh = false;
+			// Color
+			TArray<FLinearColor> Colors;
+			Colors.Init(FLinearColor::Black, UVs.Num());
+			CurrentFrameColorBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_Colors"), Colors.GetTypeSize(), Colors.Num(), Colors.GetData(), Colors.GetTypeSize() * Colors.Num());
+			CurrentFrameColorsUAV = GraphBuilder.CreateUAV(CurrentFrameColorBuffer);
+
+			GraphBuilder.QueueBufferExtraction(CurrentFrameColorBuffer, &ColorData, ERHIAccess::CPURead);
+		}
+		else
+		{
+			if (UVData.IsValid())
+			{
+				CurrentFrameUVsSRV = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(UVData, ERDGBufferFlags::MultiFrame));
+			}
+
+			CurrentFrameColorBuffer = GraphBuilder.RegisterExternalBuffer(ColorData, ERDGBufferFlags::MultiFrame);
+			CurrentFrameColorsUAV = GraphBuilder.CreateUAV(CurrentFrameColorBuffer);
+		}
+
+		DeviceRGBSubsystem->ResetDirtyFlags();
 	}
-	else
+	else if (!CurrentFrameUVsSRV && !CurrentFrameColorsUAV)
 	{
+		check(UVData.IsValid() && ColorData.IsValid());
 		if (UVData.IsValid())
 		{
-			Parameters->LedUVs = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(UVData, ERDGBufferFlags::MultiFrame));
+			CurrentFrameUVsSRV = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(UVData, ERDGBufferFlags::MultiFrame));
 		}
 		
 		if (IndexData.IsValid())
 		{
-			Parameters->IndexBuffer = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(IndexData, ERDGBufferFlags::MultiFrame));
+			CurrentFrameIndexBufferSRV = GraphBuilder.CreateSRV(GraphBuilder.RegisterExternalBuffer(IndexData, ERDGBufferFlags::MultiFrame));
 		}
 
-		ColorsBuffer = GraphBuilder.RegisterExternalBuffer(ColorData, ERDGBufferFlags::MultiFrame);
-		Parameters->Colors = GraphBuilder.CreateUAV(ColorsBuffer);
+		CurrentFrameColorBuffer = GraphBuilder.RegisterExternalBuffer(ColorData, ERDGBufferFlags::MultiFrame);
+		CurrentFrameColorsUAV = GraphBuilder.CreateUAV(CurrentFrameColorBuffer);
 	}
 
-	GraphBuilder.QueueBufferExtraction(ColorsBuffer, &ReadbackData, ERHIAccess::CPURead);
+	Parameters->LedUVs = CurrentFrameUVsSRV;
+	Parameters->Colors = CurrentFrameColorsUAV;
+	Parameters->IndexBuffer = CurrentFrameIndexBufferSRV;
 
 	return Parameters;
 }
@@ -287,6 +311,16 @@ FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& Graph
 			Shader, Parameters, MaterialInfo.MaterialProxy, ViewInfo
 		);
 	}
+
+	if (CurrentFrameColorBuffer)
+	{
+		GraphBuilder.QueueBufferExtraction(CurrentFrameColorBuffer, &ReadbackData, ERHIAccess::CPURead);
+	}
+
+	CurrentFrameUVsSRV = nullptr;
+	CurrentFrameIndexBufferSRV = nullptr;
+	CurrentFrameColorsUAV = nullptr;
+	CurrentFrameColorBuffer = nullptr;
 
 	return Inputs.GetInput(EPostProcessMaterialInput::SceneColor);
 }

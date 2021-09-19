@@ -44,12 +44,16 @@ private:
 
 	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> UVData;
+	FRDGBufferSRVRef CurrentFrameUVsSRV = nullptr;
 
 	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> IndexData;
+	FRDGBufferSRVRef CurrentFrameIndexBufferSRV = nullptr;
 
 	/** Persistent buffer for the colors */
 	TRefCountPtr<class FRDGPooledBuffer> ColorData;
+	FRDGBufferUAVRef CurrentFrameColorsUAV = nullptr;
+	FRDGBufferRef CurrentFrameColorBuffer = nullptr;
 
 	mutable class FViewport* CurrentActiveViewport = nullptr;
 };

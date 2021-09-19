@@ -15,6 +15,7 @@ public class DeviceRGB : ModuleRules
 			{
 				"Core",
 				"Projects",
+				"UMG",
 			}
 		);
 

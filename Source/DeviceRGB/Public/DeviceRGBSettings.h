@@ -3,14 +3,16 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include <Slate/WidgetTransform.h>
 #include "DeviceRGBSettings.generated.h"
 
 class UMaterialInterface;
+class IDeviceRGB;
 
 /**
  * 
  */
-UCLASS(config = Engine, defaultconfig)
+UCLASS(config = Game, defaultconfig)
 class DEVICERGB_API UDeviceRGBSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
@@ -22,6 +24,8 @@ public:
 	UDeviceRGBSettings();
 
 	FString GetProjectName() const;
+
+	FWidgetTransform GetTransformForDevice(const IDeviceRGB* InDevice) const;
 
 #if WITH_EDITOR
 
@@ -47,5 +51,21 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = Privacy, meta = (EditCondition = "!bAllowRegisteringProjectName"))
 	FString ProjectNameOverride = DefaultProjectNameOverride;
 
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform KeyboardTransform;
 
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform KeypadTransform;
+
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform MouseTransform;
+
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform MousepadTransform;
+
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform HeadsetTransform;
+
+	UPROPERTY(config, EditAnywhere, Category = Transforms)
+	FWidgetTransform OtherTransform;
 };

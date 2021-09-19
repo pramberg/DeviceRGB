@@ -1,6 +1,8 @@
 // Copyright(c) 2021 Viktor Pramberg
 #include "DeviceRGBSettings.h"
 #include "DeviceRGB.h"
+#include "DeviceRGBSubsystem.h"
+
 #include <Materials/MaterialInterface.h>
 #include <GeneralProjectSettings.h>
 
@@ -41,6 +43,23 @@ FString UDeviceRGBSettings::GetProjectName() const
 	return Name;
 }
 
+FWidgetTransform UDeviceRGBSettings::GetTransformForDevice(const IDeviceRGB* InDevice) const
+{
+	switch (InDevice->GetType())
+	{
+	case EDeviceRGBType::Keyboard: return KeyboardTransform;
+	case EDeviceRGBType::Keypad: return KeypadTransform;
+	case EDeviceRGBType::Mouse: return MouseTransform;
+	case EDeviceRGBType::Mousepad: return MousepadTransform;
+	case EDeviceRGBType::Headset: return HeadsetTransform;
+	case EDeviceRGBType::Other: return OtherTransform;
+	default:
+		checkNoEntry();
+	}
+
+	return FWidgetTransform();
+}
+
 #if WITH_EDITOR
 
 FText UDeviceRGBSettings::GetSectionText() const
@@ -68,6 +87,21 @@ void UDeviceRGBSettings::PostEditChangeProperty(struct FPropertyChangedEvent& Pr
 		{
 			UE_LOG(LogDeviceRGB, Error, TEXT("ProjectNameOverride can't be empty. Resetting it to default value."));
 			ProjectNameOverride = DefaultProjectNameOverride;
+		}
+	}
+	
+	const FName TransformProperty = PropertyChangedEvent.MemberProperty->GetFName();
+	if (TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, KeyboardTransform)
+	    || TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, KeypadTransform)
+		|| TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, MouseTransform)
+		|| TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, MousepadTransform)
+		|| TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, HeadsetTransform)
+		|| TransformProperty == GET_MEMBER_NAME_CHECKED(UDeviceRGBSettings, OtherTransform)
+		)
+	{
+		if (UDeviceRGBSubsystem* Subsystem = GEngine->GetEngineSubsystem<UDeviceRGBSubsystem>())
+		{
+			Subsystem->MarkDeviceInfoCacheDirty();
 		}
 	}
 }

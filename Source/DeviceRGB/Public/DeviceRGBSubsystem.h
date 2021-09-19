@@ -8,7 +8,6 @@
 #include <UObject/StrongObjectPtr.h>
 #include "DeviceRGBSubsystem.generated.h"
 
-class UTexture2D;
 class UMaterialInterface;
 class FDeviceRGBSceneViewExtension;
 
@@ -31,7 +30,7 @@ struct FDeviceRGBLayerInfo
 
 public:
 	// The material or texture to use for this layer
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowedClasses = "Texture2D, MaterialInterface", DisallowedClasses = "TextureLightProfile"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowedClasses = "Texture2D, MaterialInterface"))
 	UObject* Graphic;
 
 	// The blend mode to use for this layer
@@ -130,34 +129,49 @@ public:
 	virtual void Deinitialize() override;
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 	//~ End UEngineSubsystem Interface
+	
+	void RegisterController(TUniquePtr<IDeviceRGBController>&& InController);
 
+private:
 	const auto& GetCachedInfos() const { return CachedLEDInfos; }
-	const auto& GetGraphicsCaches() const { return (GraphicsCaches); }
+	const auto& GetGraphicsCaches() const { return GraphicsCaches; }
 
 	void SetColors(TFunctionRef<void(IDeviceRGB*, TArray<FColor>&)> InFunction);
 
-	void MarkCacheDirty();
-	void RegisterController(TUniquePtr<IDeviceRGBController>&& InController);
+	/** This forces a rebuild of indices, but is fairly cheap */
+	void MarkGraphicsCacheDirty();
+
+	/** This forces a full rebuild of all LEDs. Avoid calling if possible. */
+	void MarkDeviceInfoCacheDirty();
+
+	bool ShouldRebuild() const { return bGraphicsCacheDirty || bDeviceInfoCacheDirty; }
+	bool ShouldDoCompleteRebuild() const { return bDeviceInfoCacheDirty; }
+	void ResetDirtyFlags();
+
 	void ForEachDevice(TFunctionRef<void(IDeviceRGB*)> InFunction);
 	void ForEachDevice(TFunctionRef<void(IDeviceRGB*, int32)> InFunction);
 
-private:
 	TOptional<FDeviceRGBGraphicCache> CreateGraphicsCache(const FDeviceRGBLayerInfo& InInfo);
 
 private:
-	TArray<FDeviceRGBGraphicCache> GraphicsCaches;
-
 	TSharedPtr<FDeviceRGBSceneViewExtension, ESPMode::ThreadSafe> ViewExtension;
 
-	TArray<TUniquePtr<IDeviceRGBController>> SupportedSDKs;
-	// Contains all connected devices' infos. 
+	/** All registered controllers. */
+	TArray<TUniquePtr<IDeviceRGBController>> Controllers;
+
+	/** Contains all connected devices' infos. */
 	TArray<FDeviceLEDInfo> CachedLEDInfos;
 
-	// Contains the range of each device in the cached LED infos array. [Min, Max)
+	/** Data used by the view extension to render a graphic to some LEDs. */
+	TArray<FDeviceRGBGraphicCache> GraphicsCaches;
+
+	/** Contains the range of each device in the cached LED infos array. [Min, Max) */
 	TArray<TInterval<int32>> DeviceRanges;
 
-	bool bForceRefresh = true;
+	bool bGraphicsCacheDirty = false;
+	bool bDeviceInfoCacheDirty = false;
 	bool bIsEnabled = true;
 
 	friend FDeviceRGBSceneViewExtension;
+	friend class UDeviceRGBSettings;
 };
