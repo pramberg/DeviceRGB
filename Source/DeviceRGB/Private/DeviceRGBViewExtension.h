@@ -9,6 +9,14 @@ class UDeviceRGBSubsystem;
 class UMaterialInterface;
 class FRDGTexture;
 
+struct FDeviceRGBFrameResources
+{
+	FRDGBufferSRVRef UV_SRV = nullptr;
+	FRDGBufferSRVRef IndexBuffer_SRV = nullptr;
+	FRDGBufferUAVRef Colors_UAV = nullptr;
+	FRDGBufferRef ColorBuffer = nullptr;
+};
+
 /**
   * Used to efficiently render a potential material to texture after the scene has been rendered. This is effectively a post process material that has
   * access to all scene textures, but is not actually displayed on screen.
@@ -34,7 +42,9 @@ public:
 	/** Performs the readback from the GPU after the graph builder has executed. */
 	virtual void EndFrame() override;
 
-	class FDeviceRGBMaterialParameters* CreateParameters(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs);
+	class FDeviceRGBMaterialParameters* CreateParameters(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs, const FDeviceRGBFrameResources& FrameResources);
+
+	FDeviceRGBFrameResources GatherFrameResources(FRDGBuilder& GraphBuilder);
 
 private:
 	UDeviceRGBSubsystem* DeviceRGBSubsystem;
@@ -44,16 +54,12 @@ private:
 
 	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> UVData;
-	FRDGBufferSRVRef CurrentFrameUVsSRV = nullptr;
 
 	/** Persistent buffer for the UVs */
 	TRefCountPtr<class FRDGPooledBuffer> IndexData;
-	FRDGBufferSRVRef CurrentFrameIndexBufferSRV = nullptr;
 
 	/** Persistent buffer for the colors */
 	TRefCountPtr<class FRDGPooledBuffer> ColorData;
-	FRDGBufferUAVRef CurrentFrameColorsUAV = nullptr;
-	FRDGBufferRef CurrentFrameColorBuffer = nullptr;
 
 	mutable class FViewport* CurrentActiveViewport = nullptr;
 };
