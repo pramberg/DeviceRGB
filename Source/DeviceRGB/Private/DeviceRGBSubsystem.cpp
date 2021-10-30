@@ -81,6 +81,11 @@ void UDeviceRGBSubsystem::SetEnabled(bool bEnabled)
 		return;
 	}
 
+	if (bEnabled && GraphicsCaches.Num() == 0)
+	{
+		return;
+	}
+
 	bIsEnabled = bEnabled;
 	for (auto& Controller : Controllers)
 	{
