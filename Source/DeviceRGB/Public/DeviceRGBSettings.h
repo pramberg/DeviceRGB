@@ -68,4 +68,7 @@ public:
 
 	UPROPERTY(config, EditAnywhere, Category = Transforms)
 	FWidgetTransform OtherTransform;
+
+	/* The transform that will be used for unknown devices. */
+	FWidgetTransform IdentityTransform;
 };

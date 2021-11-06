@@ -2,6 +2,7 @@
 #include "DeviceRGBViewExtension.h"
 #include "DeviceRGBSubsystem.h"
 #include "IDeviceRGB.h"
+#include "DeviceRGBStats.h"
 
 #include <PostProcess/PostProcessMaterial.h>
 #include <PostProcess/PostProcessing.h>
@@ -12,6 +13,13 @@
 #include <Async/Async.h>
 #include <ScreenPass.h>
 #include <Shader.h>
+
+DECLARE_CYCLE_STAT(TEXT("Gather Frame Resources"), STAT_GatherFrameResources, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("Dispatch Layers"), STAT_DispatchLayers, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("End Frame"), STAT_EndFrame, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("Readback"), STAT_Readback, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("Readback Lock"), STAT_ReadbackLock, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("Set Colors"), STAT_SetColors, STATGROUP_DeviceRGB);
 
 BEGIN_SHADER_PARAMETER_STRUCT(FDeviceRGBMaterialParameters, )
 	SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
@@ -159,7 +167,7 @@ void FDeviceRGBSceneViewExtension::SubscribeToPostProcessingPass(EPostProcessing
 {
 	if (Pass == EPostProcessingPass::FXAA)
 	{
-		InOutPassCallbacks.Add(FAfterPassCallbackDelegate::CreateRaw(this, &FDeviceRGBSceneViewExtension::RenderLayers));
+		InOutPassCallbacks.Add(FAfterPassCallbackDelegate::CreateRaw(this, &FDeviceRGBSceneViewExtension::DispatchLayers));
 	}
 }
 
@@ -199,11 +207,15 @@ FDeviceRGBMaterialParameters* FDeviceRGBSceneViewExtension::CreateParameters(FRD
 
 FDeviceRGBFrameResources FDeviceRGBSceneViewExtension::GatherFrameResources(FRDGBuilder& GraphBuilder)
 {
+	SCOPE_CYCLE_COUNTER(STAT_GatherFrameResources);
+
 	FDeviceRGBFrameResources FrameResources;
 
 	if (DeviceRGBSubsystem->ShouldRebuild())
 	{
 		RDG_EVENT_SCOPE(GraphBuilder, "Setup");
+
+		FScopeLock Lock(&DeviceRGBSubsystem->DeviceInfoCriticalSection);
 
 		// Index buffer - Will always need to be rebuilt
 		TArray<uint32> Indices;
@@ -212,11 +224,20 @@ FDeviceRGBFrameResources FDeviceRGBSceneViewExtension::GatherFrameResources(FRDG
 			Indices.Append(Graphic.Indices);
 		}
 
+		const auto CreateStructuredBufferFromArray = [&](const TCHAR* Name, const auto& Array)
+		{
+			return CreateStructuredBuffer(GraphBuilder, Name, Array.GetTypeSize(), Array.Num(), Array.GetData(), Array.GetTypeSize() * Array.Num());
+		};
+
 		if (Indices.Num() > 0)
 		{
-			auto IndexBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_IndexBuffer"), Indices.GetTypeSize(), Indices.Num(), Indices.GetData(), Indices.GetTypeSize() * Indices.Num());
+			auto IndexBuffer = CreateStructuredBufferFromArray(TEXT("DeviceRGB_IndexBuffer"), Indices);
 			FrameResources.IndexBuffer_SRV = GraphBuilder.CreateSRV(IndexBuffer);
 			GraphBuilder.QueueBufferExtraction(IndexBuffer, &IndexData, ERHIAccess::SRVCompute);
+		}
+		else
+		{
+			IndexData.SafeRelease();
 		}
 
 		if (DeviceRGBSubsystem->ShouldDoCompleteRebuild())
@@ -226,15 +247,16 @@ FDeviceRGBFrameResources FDeviceRGBSceneViewExtension::GatherFrameResources(FRDG
 			{
 				UVs.Add(LedInfo.UV);
 			}
+			NumLeds = UVs.Num();
 
-			auto LedUVsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_LedUVs"), UVs.GetTypeSize(), UVs.Num(), UVs.GetData(), UVs.GetTypeSize() * UVs.Num());
+			auto LedUVsBuffer = CreateStructuredBufferFromArray(TEXT("DeviceRGB_LedUVs"), UVs);
 			FrameResources.UV_SRV = GraphBuilder.CreateSRV(LedUVsBuffer);
 			GraphBuilder.QueueBufferExtraction(LedUVsBuffer, &UVData, ERHIAccess::SRVCompute);
 
 			// Color
 			TArray<FLinearColor> Colors;
-			Colors.Init(FLinearColor::Black, UVs.Num());
-			FrameResources.ColorBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("DeviceRGB_Colors"), Colors.GetTypeSize(), Colors.Num(), Colors.GetData(), Colors.GetTypeSize() * Colors.Num());
+			Colors.Init(FLinearColor::Black, NumLeds);
+			FrameResources.ColorBuffer = CreateStructuredBufferFromArray(TEXT("DeviceRGB_Colors"), Colors);
 			FrameResources.Colors_UAV = GraphBuilder.CreateUAV(FrameResources.ColorBuffer);
 
 			GraphBuilder.QueueBufferExtraction(FrameResources.ColorBuffer, &ColorData, ERHIAccess::CPURead);
@@ -269,8 +291,10 @@ FDeviceRGBFrameResources FDeviceRGBSceneViewExtension::GatherFrameResources(FRDG
 	return FrameResources;
 }
 
-FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs)
+FScreenPassTexture FDeviceRGBSceneViewExtension::DispatchLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs)
 {
+	SCOPE_CYCLE_COUNTER(STAT_DispatchLayers);
+
 	RDG_EVENT_SCOPE(GraphBuilder, "DeviceRGB");
 
 	checkSlow(View.bIsViewInfo);
@@ -278,9 +302,9 @@ FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& Graph
 
 	Inputs.Validate();
 
-	RDG_EVENT_SCOPE(GraphBuilder, "Layers");
-
 	const FDeviceRGBFrameResources FrameResources = GatherFrameResources(GraphBuilder);
+
+	RDG_EVENT_SCOPE(GraphBuilder, "Layers");
 
 	uint32 IndexBufferStart = 0;
 	const auto& GraphicCaches = DeviceRGBSubsystem->GetGraphicsCaches();
@@ -299,7 +323,7 @@ FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& Graph
 		}
 		else
 		{
-			Parameters->NumItems = DeviceRGBSubsystem->GetCachedInfos().Num();
+			Parameters->NumItems = NumLeds;
 		}
 
 		UMaterialInterface* MaterialInterface = Cache.Material.Get();
@@ -326,28 +350,38 @@ FScreenPassTexture FDeviceRGBSceneViewExtension::RenderLayers(FRDGBuilder& Graph
 
 void FDeviceRGBSceneViewExtension::EndFrame()
 {
-	if (!DeviceRGBSubsystem || !DeviceRGBSubsystem->IsEnabled() || DeviceRGBSubsystem->GetGraphicsCaches().Num() == 0)
+	SCOPE_CYCLE_COUNTER(STAT_EndFrame);
+
+	if (!DeviceRGBSubsystem || !DeviceRGBSubsystem->IsEnabled() || NumLeds == 0)
 	{
 		return;
 	}
 
 	ENQUEUE_RENDER_COMMAND(FPerformEndOfFrameReadback)([this](FRHICommandListImmediate& RHICmdList)
 	{
+		SCOPE_CYCLE_COUNTER(STAT_Readback);
+
 		if (ReadbackData && ReadbackData->GetStructuredBufferRHI() && ReadbackData->GetStructuredBufferRHI()->IsValid())
 		{
 			SCOPED_DRAW_EVENT(RHICmdList, DeviceRGB_DataReadback);
 
 			TArray<FLinearColor> ColorsTemp;
-			ColorsTemp.Init(FLinearColor::Black, DeviceRGBSubsystem->GetCachedInfos().Num());
+			ColorsTemp.Init(FLinearColor::Black, NumLeds);
 
 			const uint32 Size = static_cast<uint32>(ColorsTemp.Num()) * ColorsTemp.GetTypeSize();
 
-			void* Source = RHICmdList.LockStructuredBuffer(ReadbackData->GetStructuredBufferRHI(), 0, Size, RLM_ReadOnly);
-			FMemory::Memcpy(ColorsTemp.GetData(), Source, Size);
-			RHICmdList.UnlockStructuredBuffer(ReadbackData->GetStructuredBufferRHI());
+			{
+				SCOPE_CYCLE_COUNTER(STAT_ReadbackLock);
+
+				void* Source = RHICmdList.LockStructuredBuffer(ReadbackData->GetStructuredBufferRHI(), 0, Size, RLM_ReadOnly);
+				FMemory::Memcpy(ColorsTemp.GetData(), Source, Size);
+				RHICmdList.UnlockStructuredBuffer(ReadbackData->GetStructuredBufferRHI());
+			}
 			
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, Colors = MoveTemp(ColorsTemp)]()
 			{
+				SCOPE_CYCLE_COUNTER(STAT_SetColors);
+
 				auto It = Colors.CreateConstIterator();
 				DeviceRGBSubsystem->SetColors([&](IDeviceRGB* InDevice, TArray<FColor>& OutColors)
 				{

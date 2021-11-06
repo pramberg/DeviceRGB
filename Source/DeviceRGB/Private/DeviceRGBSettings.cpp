@@ -53,11 +53,12 @@ FWidgetTransform UDeviceRGBSettings::GetTransformForDevice(const IDeviceRGB* InD
 	case EDeviceRGBType::Mousepad: return MousepadTransform;
 	case EDeviceRGBType::Headset: return HeadsetTransform;
 	case EDeviceRGBType::Other: return OtherTransform;
+	case EDeviceRGBType::Unknown: break;
 	default:
 		checkNoEntry();
 	}
-
-	return FWidgetTransform();
+	
+	return IdentityTransform;
 }
 
 #if WITH_EDITOR

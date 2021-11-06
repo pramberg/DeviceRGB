@@ -38,7 +38,6 @@ public:
 
 	static TUniquePtr<FLogitechController> Construct();
 
-	virtual void FlushBuffers() override {}
 	virtual void SetEnabled(bool bEnabled) override;
 
 private:

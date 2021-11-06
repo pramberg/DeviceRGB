@@ -4,11 +4,15 @@
 #include "DeviceRGBSettings.h"
 #include "IDeviceRGB.h"
 #include "DeviceRGB.h"
+#include "DeviceRGBStats.h"
 
 #include <Engine/Texture2D.h>
 #include <Materials/MaterialInterface.h>
 #include <Materials/MaterialInstanceDynamic.h>
 #include <Algo/Transform.h>
+
+DECLARE_CYCLE_STAT(TEXT("DeviceInfo Cache Dirty"), STAT_MarkDeviceInfoCacheDirty, STATGROUP_DeviceRGB);
+DECLARE_CYCLE_STAT(TEXT("Create Graphics Cache"), STAT_CreateGraphicsCache, STATGROUP_DeviceRGB);
 
 bool UDeviceRGBSubsystem::AddLayer(const FDeviceRGBLayerInfo& InInfo)
 {
@@ -154,6 +158,10 @@ FVector2D Frac(const FVector2D& Value)
 
 void UDeviceRGBSubsystem::MarkDeviceInfoCacheDirty()
 {
+	SCOPE_CYCLE_COUNTER(STAT_MarkDeviceInfoCacheDirty);
+
+	FScopeLock Lock(&DeviceInfoCriticalSection);
+
 	bDeviceInfoCacheDirty = true;
 
 	CachedLEDInfos.Empty();
@@ -226,6 +234,8 @@ bool IsValidTextureMaterial(UMaterialInterface* InMaterial)
 
 TOptional<FDeviceRGBGraphicCache> UDeviceRGBSubsystem::CreateGraphicsCache(const FDeviceRGBLayerInfo& InInfo)
 {
+	SCOPE_CYCLE_COUNTER(STAT_CreateGraphicsCache);
+
 	if (!InInfo.Graphic)
 	{
 		return TOptional<FDeviceRGBGraphicCache>();

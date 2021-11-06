@@ -37,7 +37,7 @@ public:
 	virtual void SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) override;
 	//~ End FSceneViewExtensionBase Interface
 	
-	FScreenPassTexture RenderLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs);
+	FScreenPassTexture DispatchLayers(FRDGBuilder& GraphBuilder, const FSceneView& View, const FPostProcessMaterialInputs& Inputs);
 
 	/** Performs the readback from the GPU after the graph builder has executed. */
 	virtual void EndFrame() override;
@@ -60,6 +60,8 @@ private:
 
 	/** Persistent buffer for the colors */
 	TRefCountPtr<class FRDGPooledBuffer> ColorData;
+
+	int32 NumLeds = 0;
 
 	mutable class FViewport* CurrentActiveViewport = nullptr;
 };

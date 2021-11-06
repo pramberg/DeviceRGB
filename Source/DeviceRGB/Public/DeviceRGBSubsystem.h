@@ -6,6 +6,7 @@
 #include "IDeviceRGBController.h"
 #include "IDeviceRGB.h"
 #include <UObject/StrongObjectPtr.h>
+#include <HAL/CriticalSection.h>
 #include "DeviceRGBSubsystem.generated.h"
 
 class UMaterialInterface;
@@ -171,6 +172,8 @@ private:
 	bool bGraphicsCacheDirty = false;
 	bool bDeviceInfoCacheDirty = false;
 	bool bIsEnabled = true;
+
+	FCriticalSection DeviceInfoCriticalSection;
 
 	friend FDeviceRGBSceneViewExtension;
 	friend class UDeviceRGBSettings;

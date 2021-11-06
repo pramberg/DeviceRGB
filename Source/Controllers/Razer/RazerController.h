@@ -36,8 +36,6 @@ public:
 
 	static TUniquePtr<FRazerController> Construct();
 
-	virtual void FlushBuffers() override {}
-
 	static constexpr EDeviceRGBType ToDeviceRGBType(ERazerDeviceType InRazerDeviceType);
 
 	virtual void SetEnabled(bool bEnabled) override;

@@ -14,7 +14,7 @@ public:
 	virtual bool SetColors(const TArray<FColor>& InColors, bool bInFlushBuffers = true) override;
 	virtual TArray<FDeviceLEDInfo> GetLEDInfos() const override { return LEDInfos; }
 	virtual FVector2D GetPhysicalSize() const override { return DeviceSize; }
-	virtual EDeviceRGBType GetType() const override { return EDeviceRGBType::Mouse; } // I'm not sure what to do here.
+	virtual EDeviceRGBType GetType() const override { return EDeviceRGBType::Unknown; }
 	virtual TArray<int32> GetIndicesForKeys(const TArray<FKey>& InKeys) override;
 
 private:
